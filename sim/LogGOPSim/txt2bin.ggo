@@ -1,0 +1,7 @@
+package "goalsim" 
+version "0.1"
+
+option "input"      i "Input file, textfile containing GOAL schedules" string typestr="filename"
+option "output"     o "Output file, will contain the binary representation of the GOAL schedules" string typestr="filename"
+option "progress"   p "Print progress information while parsing the schedule" flag off
+

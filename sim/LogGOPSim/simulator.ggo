@@ -1,0 +1,24 @@
+package "goalsim" 
+version "0.1"
+
+
+option "filename"       f  "Prefix for the filenames which contain the schedules" string
+option "save-mem"       -  "Map the schedules as MAP_SHARED to enable processing of large schedule (larger than main memory). This will invalidate the schedules during simulation." flag off
+option "LogGOPS_L"        L  "The latency parameter L in the LogGP model" int default="2500" optional
+option "LogGOPS_o"        o  "The overhead parameter o in the LogGP model" int default="1500" optional
+option "LogGOPS_g"        g  "The gap per message parameter g in the LogGP model" int default="1000" optional
+option "LogGOPS_G"        G  "The gap per byte parameter G in the LogGP model" int default="6" optional
+option "LogGOPS_S"        S  "Datasize at which we change from eager to rendezvous protocol" int  default="65535" optional
+option "LogGOPS_O"	      O  "The overhead per byte in LogGOP" int default="0" optional
+#option "starttimes"    t  "Name of an output file from a previous run, the end times of the old simulation will be the starttime of this one" string optional
+option "vizfile"        V  "Name of the output file for visualization data" string optional
+option "verbose"        v  "Enable more verbose output" optional
+option "progress"       -  "print progress" optional
+option "batchmode"      b  "enable batchmode (never print detailed host info)" optional
+#option "collnoise"     -  "Enable noise in collective operations" optional
+option "noise-trace"    -  "Read Noise from trace <file>" string optional
+option "noise-cosched"  -  "Co-schedule noise (use same starttime on all processes)" flag off
+option "network-type"   n  "Network type (LogGP=no network congestion; simple=simple linear model)" values="LogGP","simple" default="LogGP" string optional
+option "network-file"   -  "Input file for network (annotated dot format)" string optional
+option "qstat"          -  "Enable PQ and UQ statistics.  Argument is output filename prefix" default="Unknown" string optional
+option "comm-dep-file"  - "Save the dependencies between sends/recvs to this file" string optional
