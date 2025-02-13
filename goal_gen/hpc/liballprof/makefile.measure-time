@@ -1,0 +1,24 @@
+CC=mpicc
+F77_SRC=measure_time_f77.c
+C_SRC=measure_time.c
+
+all: timer f77_timer
+
+timer: measure_time.o
+	${CC} -shared -fPIC -Wl,-soname,mpi_timer.so.1 -o mpi_timer.so $<
+
+f77_timer: measure_time_f77.o
+	${CC} -shared -fPIC -Wl,-soname,mpi_timer_f77.so.1 -o mpi_timer_f77.so $<
+	  
+
+measure_time.o:
+	${CC} -fPIC ${CFLAGS} -o $@ -c ${C_SRC}
+
+measure_time_f77.o:
+	${CC} -fPIC ${CFLAGS} -o $@ -c ${F77_SRC}
+
+clean:
+	rm -f mpi_timer.so
+	rm -f mpi_timer_f77.so
+	rm -f measure_time.o
+	rm -f measure_time_f77.o

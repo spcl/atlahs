@@ -1,0 +1,4467 @@
+MPI_Abort:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: errorcode
+    type: int
+  return_type: int
+MPI_Accumulate:
+  params:
+  - name: origin_addr
+    type: const void *
+  - name: origin_count
+    type: int
+  - name: origin_datatype
+    type: MPI_Datatype
+  - name: target_rank
+    type: int
+  - name: target_disp
+    type: MPI_Aint
+  - name: target_count
+    type: int
+  - name: target_datatype
+    type: MPI_Datatype
+  - name: op
+    type: MPI_Op
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Add_error_class:
+  params:
+  - name: errorclass
+    type: int *
+  return_type: int
+MPI_Add_error_code:
+  params:
+  - name: errorclass
+    type: int
+  - name: errorcode
+    type: int *
+  return_type: int
+MPI_Add_error_string:
+  params:
+  - name: errorcode
+    type: int
+  - name: string
+    type: const char *
+  return_type: int
+MPI_Allgather:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - name: recvcount
+    type: int
+  - name: recvtype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Allgatherv:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - elem_count: size
+    name: recvcounts
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: size
+    name: displs
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - name: recvtype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Alloc_mem:
+  params:
+  - name: size
+    type: MPI_Aint
+  - name: info
+    type: MPI_Info
+  - name: baseptr
+    type: void *
+  return_type: int
+MPI_Allreduce:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: recvbuf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: op
+    type: MPI_Op
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Alltoall:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - name: recvcount
+    type: int
+  - name: recvtype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Alltoallv:
+  params:
+  - name: sendbuf
+    type: const void *
+  - elem_count: size
+    name: sendcounts
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: size
+    name: sdispls
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - elem_count: size
+    name: recvcounts
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: size
+    name: rdispls
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - name: recvtype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Alltoallw:
+  params:
+  - name: sendbuf
+    type: const void *
+  - elem_count: size
+    name: sendcounts
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: size
+    name: sdispls
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: size
+    name: sendtypes
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const MPI_Datatype[]
+  - name: recvbuf
+    type: void *
+  - elem_count: size
+    name: recvcounts
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: size
+    name: rdispls
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: size
+    name: recvtypes
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const MPI_Datatype[]
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Attr_delete:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: keyval
+    type: int
+  return_type: int
+MPI_Attr_get:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: keyval
+    type: int
+  - name: attribute_val
+    type: void *
+  - name: flag
+    type: int *
+  return_type: int
+MPI_Attr_put:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: keyval
+    type: int
+  - name: attribute_val
+    type: void *
+  return_type: int
+MPI_Barrier:
+  params:
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Bcast:
+  params:
+  - name: buffer
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: root
+    type: int
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Bsend:
+  params:
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: dest
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Bsend_init:
+  params:
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: dest
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Buffer_attach:
+  params:
+  - name: buffer
+    type: void *
+  - name: size
+    type: int
+  return_type: int
+MPI_Buffer_detach:
+  params:
+  - name: buffer
+    type: void *
+  - name: size
+    type: int *
+  return_type: int
+MPI_Cancel:
+  params:
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Cart_coords:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: rank
+    type: int
+  - name: maxdims
+    type: int
+  - elem_count: maxdims
+    name: coords
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  return_type: int
+MPI_Cart_create:
+  params:
+  - name: old_comm
+    type: MPI_Comm
+  - name: ndims
+    type: int
+  - elem_count: ndims
+    name: dims
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: ndims
+    name: periods
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - name: reorder
+    type: int
+  - name: comm_cart
+    type: MPI_Comm *
+  return_type: int
+MPI_Cart_get:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: maxdims
+    type: int
+  - elem_count: maxdims
+    name: dims
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  - elem_count: maxdims
+    name: periods
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  - elem_count: maxdims
+    name: coords
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  return_type: int
+MPI_Cart_map:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: ndims
+    type: int
+  - elem_count: ndims
+    name: dims
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: ndims
+    name: periods
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - name: newrank
+    type: int *
+  return_type: int
+MPI_Cart_rank:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - elem_count: ndims
+    name: coords
+    prolog_elem_count: int ndims; PMPI_Cartdim_get(comm, &ndims);
+    trace_each_elem: true
+    type: const int[]
+  - name: rank
+    type: int *
+  return_type: int
+MPI_Cart_shift:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: direction
+    type: int
+  - name: disp
+    type: int
+  - name: rank_source
+    type: int *
+  - name: rank_dest
+    type: int *
+  return_type: int
+MPI_Cart_sub:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - elem_count: ndims
+    name: remain_dims
+    prolog_elem_count: int ndims; PMPI_Cartdim_get(comm, &ndims);
+    trace_each_elem: true
+    type: const int[]
+  - name: new_comm
+    type: MPI_Comm *
+  return_type: int
+MPI_Cartdim_get:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: ndims
+    type: int *
+  return_type: int
+MPI_Close_port:
+  params:
+  - name: port_name
+    type: const char *
+  return_type: int
+MPI_Comm_accept:
+  params:
+  - name: port_name
+    type: const char *
+  - name: info
+    type: MPI_Info
+  - name: root
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: newcomm
+    type: MPI_Comm *
+  return_type: int
+MPI_Comm_call_errhandler:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: errorcode
+    type: int
+  return_type: int
+MPI_Comm_compare:
+  params:
+  - name: comm1
+    type: MPI_Comm
+  - name: comm2
+    type: MPI_Comm
+  - name: result
+    type: int *
+  return_type: int
+MPI_Comm_connect:
+  params:
+  - name: port_name
+    type: const char *
+  - name: info
+    type: MPI_Info
+  - name: root
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: newcomm
+    type: MPI_Comm *
+  return_type: int
+MPI_Comm_create:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: group
+    type: MPI_Group
+  - name: newcomm
+    type: MPI_Comm *
+  return_type: int
+MPI_Comm_create_errhandler:
+  params:
+  - name: function
+    type: MPI_Comm_errhandler_function *
+  - name: errhandler
+    type: MPI_Errhandler *
+  return_type: int
+MPI_Comm_create_group:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: group
+    type: MPI_Group
+  - name: tag
+    type: int
+  - name: newcomm
+    type: MPI_Comm *
+  return_type: int
+MPI_Comm_create_keyval:
+  params:
+  - name: comm_copy_attr_fn
+    type: MPI_Comm_copy_attr_function *
+  - name: comm_delete_attr_fn
+    type: MPI_Comm_delete_attr_function *
+  - name: comm_keyval
+    type: int *
+  - name: extra_state
+    type: void *
+  return_type: int
+MPI_Comm_delete_attr:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: comm_keyval
+    type: int
+  return_type: int
+MPI_Comm_disconnect:
+  params:
+  - name: comm
+    type: MPI_Comm *
+  return_type: int
+MPI_Comm_dup:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: newcomm
+    type: MPI_Comm *
+  return_type: int
+MPI_Comm_dup_with_info:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: info
+    type: MPI_Info
+  - name: newcomm
+    type: MPI_Comm *
+  return_type: int
+MPI_Comm_free:
+  params:
+  - name: comm
+    type: MPI_Comm *
+  return_type: int
+MPI_Comm_free_keyval:
+  params:
+  - name: comm_keyval
+    type: int *
+  return_type: int
+MPI_Comm_get_attr:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: comm_keyval
+    type: int
+  - name: attribute_val
+    type: void *
+  - name: flag
+    type: int *
+  return_type: int
+MPI_Comm_get_errhandler:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: erhandler
+    type: MPI_Errhandler *
+  return_type: int
+MPI_Comm_get_info:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: info_used
+    type: MPI_Info *
+  return_type: int
+MPI_Comm_get_name:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: comm_name
+    type: char *
+  - name: resultlen
+    type: int *
+  return_type: int
+MPI_Comm_get_parent:
+  params:
+  - name: parent
+    type: MPI_Comm *
+  return_type: int
+MPI_Comm_group:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: group
+    type: MPI_Group *
+  return_type: int
+MPI_Comm_idup:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: newcomm
+    type: MPI_Comm *
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Comm_join:
+  params:
+  - name: fd
+    type: int
+  - name: intercomm
+    type: MPI_Comm *
+  return_type: int
+MPI_Comm_rank:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: rank
+    type: int *
+  return_type: int
+MPI_Comm_remote_group:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: group
+    type: MPI_Group *
+  return_type: int
+MPI_Comm_remote_size:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: size
+    type: int *
+  return_type: int
+MPI_Comm_set_attr:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: comm_keyval
+    type: int
+  - name: attribute_val
+    type: void *
+  return_type: int
+MPI_Comm_set_errhandler:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: errhandler
+    type: MPI_Errhandler
+  return_type: int
+MPI_Comm_set_info:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: info
+    type: MPI_Info
+  return_type: int
+MPI_Comm_set_name:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: comm_name
+    type: const char *
+  return_type: int
+MPI_Comm_size:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: size
+    type: int *
+  return_type: int
+MPI_Comm_spawn:
+  params:
+  - name: command
+    type: const char *
+  - elem_count: null
+    name: argv
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: char *[]
+  - name: maxprocs
+    type: int
+  - name: info
+    type: MPI_Info
+  - name: root
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: intercomm
+    type: MPI_Comm *
+  - elem_count: maxprocs
+    name: array_of_errcodes
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  return_type: int
+MPI_Comm_spawn_multiple:
+  params:
+  - name: count
+    type: int
+  - elem_count: count
+    name: array_of_commands
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: char *[]
+  - elem_count: count
+    name: array_of_argv
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: char **[]
+  - elem_count: count
+    name: array_of_maxprocs
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: count
+    name: array_of_info
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const MPI_Info[]
+  - name: root
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: intercomm
+    type: MPI_Comm *
+  - elem_count: count
+    name: array_of_errcodes
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  return_type: int
+MPI_Comm_split:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: color
+    type: int
+  - name: key
+    type: int
+  - name: newcomm
+    type: MPI_Comm *
+  return_type: int
+MPI_Comm_split_type:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: split_type
+    type: int
+  - name: key
+    type: int
+  - name: info
+    type: MPI_Info
+  - name: newcomm
+    type: MPI_Comm *
+  return_type: int
+MPI_Comm_test_inter:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: flag
+    type: int *
+  return_type: int
+MPI_Compare_and_swap:
+  params:
+  - name: origin_addr
+    type: const void *
+  - name: compare_addr
+    type: const void *
+  - name: result_addr
+    type: void *
+  - name: datatype
+    type: MPI_Datatype
+  - name: target_rank
+    type: int
+  - name: target_disp
+    type: MPI_Aint
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Dims_create:
+  params:
+  - name: nnodes
+    type: int
+  - name: ndims
+    type: int
+  - elem_count: ndims
+    name: dims
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  return_type: int
+MPI_Dist_graph_create:
+  params:
+  - name: comm_old
+    type: MPI_Comm
+  - name: n
+    type: int
+  - elem_count: n
+    name: nodes
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: n
+    name: degrees
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: n
+    name: targets
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: n
+    name: weights
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - name: info
+    type: MPI_Info
+  - name: reorder
+    type: int
+  - name: newcomm
+    type: MPI_Comm *
+  return_type: int
+MPI_Dist_graph_create_adjacent:
+  params:
+  - name: comm_old
+    type: MPI_Comm
+  - name: indegree
+    type: int
+  - elem_count: indegree
+    name: sources
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: indegree
+    name: sourceweights
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - name: outdegree
+    type: int
+  - elem_count: outdegree
+    name: destinations
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: outdegree
+    name: destweights
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - name: info
+    type: MPI_Info
+  - name: reorder
+    type: int
+  - name: comm_dist_graph
+    type: MPI_Comm *
+  return_type: int
+MPI_Dist_graph_neighbors:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: maxindegree
+    type: int
+  - elem_count: maxindegree
+    name: sources
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  - elem_count: maxindegree
+    name: sourceweights
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  - name: maxoutdegree
+    type: int
+  - elem_count: maxoutdegree
+    name: destinations
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  - elem_count: maxoutdegree
+    name: destweights
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  return_type: int
+MPI_Dist_graph_neighbors_count:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: inneighbors
+    type: int *
+  - name: outneighbors
+    type: int *
+  - name: weighted
+    type: int *
+  return_type: int
+MPI_Errhandler_free:
+  params:
+  - name: errhandler
+    type: MPI_Errhandler *
+  return_type: int
+MPI_Error_class:
+  params:
+  - name: errorcode
+    type: int
+  - name: errorclass
+    type: int *
+  return_type: int
+MPI_Error_string:
+  params:
+  - name: errorcode
+    type: int
+  - name: string
+    type: char *
+  - name: resultlen
+    type: int *
+  return_type: int
+MPI_Exscan:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: recvbuf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: op
+    type: MPI_Op
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Fetch_and_op:
+  params:
+  - name: origin_addr
+    type: const void *
+  - name: result_addr
+    type: void *
+  - name: datatype
+    type: MPI_Datatype
+  - name: target_rank
+    type: int
+  - name: target_disp
+    type: MPI_Aint
+  - name: op
+    type: MPI_Op
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_File_call_errhandler:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: errorcode
+    type: int
+  return_type: int
+MPI_File_close:
+  params:
+  - name: fh
+    type: MPI_File *
+  return_type: int
+MPI_File_create_errhandler:
+  params:
+  - name: function
+    type: MPI_File_errhandler_function *
+  - name: errhandler
+    type: MPI_Errhandler *
+  return_type: int
+MPI_File_delete:
+  params:
+  - name: filename
+    type: const char *
+  - name: info
+    type: MPI_Info
+  return_type: int
+MPI_File_get_amode:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: amode
+    type: int *
+  return_type: int
+MPI_File_get_atomicity:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: flag
+    type: int *
+  return_type: int
+MPI_File_get_byte_offset:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: offset
+    type: MPI_Offset
+  - name: disp
+    type: MPI_Offset *
+  return_type: int
+MPI_File_get_errhandler:
+  params:
+  - name: file
+    type: MPI_File
+  - name: errhandler
+    type: MPI_Errhandler *
+  return_type: int
+MPI_File_get_group:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: group
+    type: MPI_Group *
+  return_type: int
+MPI_File_get_info:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: info_used
+    type: MPI_Info *
+  return_type: int
+MPI_File_get_position:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: offset
+    type: MPI_Offset *
+  return_type: int
+MPI_File_get_position_shared:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: offset
+    type: MPI_Offset *
+  return_type: int
+MPI_File_get_size:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: size
+    type: MPI_Offset *
+  return_type: int
+MPI_File_get_type_extent:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: datatype
+    type: MPI_Datatype
+  - name: extent
+    type: MPI_Aint *
+  return_type: int
+MPI_File_get_view:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: disp
+    type: MPI_Offset *
+  - name: etype
+    type: MPI_Datatype *
+  - name: filetype
+    type: MPI_Datatype *
+  - name: datarep
+    type: char *
+  return_type: int
+MPI_File_iread:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_File_iread_all:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_File_iread_at:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: offset
+    type: MPI_Offset
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_File_iread_at_all:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: offset
+    type: MPI_Offset
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_File_iread_shared:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_File_iwrite:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_File_iwrite_all:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_File_iwrite_at:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: offset
+    type: MPI_Offset
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_File_iwrite_at_all:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: offset
+    type: MPI_Offset
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_File_iwrite_shared:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_File_open:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: filename
+    type: const char *
+  - name: amode
+    type: int
+  - name: info
+    type: MPI_Info
+  - name: fh
+    type: MPI_File *
+  return_type: int
+MPI_File_preallocate:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: size
+    type: MPI_Offset
+  return_type: int
+MPI_File_read:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_File_read_all:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_File_read_all_begin:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  return_type: int
+MPI_File_read_all_end:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: void *
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_File_read_at:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: offset
+    type: MPI_Offset
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_File_read_at_all:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: offset
+    type: MPI_Offset
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_File_read_at_all_begin:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: offset
+    type: MPI_Offset
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  return_type: int
+MPI_File_read_at_all_end:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: void *
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_File_read_ordered:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_File_read_ordered_begin:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  return_type: int
+MPI_File_read_ordered_end:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: void *
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_File_read_shared:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_File_seek:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: offset
+    type: MPI_Offset
+  - name: whence
+    type: int
+  return_type: int
+MPI_File_seek_shared:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: offset
+    type: MPI_Offset
+  - name: whence
+    type: int
+  return_type: int
+MPI_File_set_atomicity:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: flag
+    type: int
+  return_type: int
+MPI_File_set_errhandler:
+  params:
+  - name: file
+    type: MPI_File
+  - name: errhandler
+    type: MPI_Errhandler
+  return_type: int
+MPI_File_set_info:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: info
+    type: MPI_Info
+  return_type: int
+MPI_File_set_size:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: size
+    type: MPI_Offset
+  return_type: int
+MPI_File_set_view:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: disp
+    type: MPI_Offset
+  - name: etype
+    type: MPI_Datatype
+  - name: filetype
+    type: MPI_Datatype
+  - name: datarep
+    type: const char *
+  - name: info
+    type: MPI_Info
+  return_type: int
+MPI_File_sync:
+  params:
+  - name: fh
+    type: MPI_File
+  return_type: int
+MPI_File_write:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_File_write_all:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_File_write_all_begin:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  return_type: int
+MPI_File_write_all_end:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: const void *
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_File_write_at:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: offset
+    type: MPI_Offset
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_File_write_at_all:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: offset
+    type: MPI_Offset
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_File_write_at_all_begin:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: offset
+    type: MPI_Offset
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  return_type: int
+MPI_File_write_at_all_end:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: const void *
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_File_write_ordered:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_File_write_ordered_begin:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  return_type: int
+MPI_File_write_ordered_end:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: const void *
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_File_write_shared:
+  params:
+  - name: fh
+    type: MPI_File
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_Finalize:
+  params: []
+  return_type: int
+MPI_Finalized:
+  params:
+  - name: flag
+    type: int *
+  return_type: int
+MPI_Free_mem:
+  params:
+  - name: base
+    type: void *
+  return_type: int
+MPI_Gather:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - name: recvcount
+    type: int
+  - name: recvtype
+    type: MPI_Datatype
+  - name: root
+    type: int
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Gatherv:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - elem_count: size
+    name: recvcounts
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: size
+    name: displs
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - name: recvtype
+    type: MPI_Datatype
+  - name: root
+    type: int
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Get:
+  params:
+  - name: origin_addr
+    type: void *
+  - name: origin_count
+    type: int
+  - name: origin_datatype
+    type: MPI_Datatype
+  - name: target_rank
+    type: int
+  - name: target_disp
+    type: MPI_Aint
+  - name: target_count
+    type: int
+  - name: target_datatype
+    type: MPI_Datatype
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Get_accumulate:
+  params:
+  - name: origin_addr
+    type: const void *
+  - name: origin_count
+    type: int
+  - name: origin_datatype
+    type: MPI_Datatype
+  - name: result_addr
+    type: void *
+  - name: result_count
+    type: int
+  - name: result_datatype
+    type: MPI_Datatype
+  - name: target_rank
+    type: int
+  - name: target_disp
+    type: MPI_Aint
+  - name: target_count
+    type: int
+  - name: target_datatype
+    type: MPI_Datatype
+  - name: op
+    type: MPI_Op
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Get_address:
+  params:
+  - name: location
+    type: const void *
+  - name: address
+    type: MPI_Aint *
+  return_type: int
+MPI_Get_count:
+  params:
+  - name: status
+    type: const MPI_Status *
+  - name: datatype
+    type: MPI_Datatype
+  - name: count
+    type: int *
+  return_type: int
+MPI_Get_elements:
+  params:
+  - name: status
+    type: const MPI_Status *
+  - name: datatype
+    type: MPI_Datatype
+  - name: count
+    type: int *
+  return_type: int
+MPI_Get_elements_x:
+  params:
+  - name: status
+    type: const MPI_Status *
+  - name: datatype
+    type: MPI_Datatype
+  - name: count
+    type: MPI_Count *
+  return_type: int
+MPI_Get_library_version:
+  params:
+  - name: version
+    type: char *
+  - name: resultlen
+    type: int *
+  return_type: int
+MPI_Get_processor_name:
+  params:
+  - name: name
+    type: char *
+  - name: resultlen
+    type: int *
+  return_type: int
+MPI_Get_version:
+  params:
+  - name: version
+    type: int *
+  - name: subversion
+    type: int *
+  return_type: int
+MPI_Graph_create:
+  params:
+  - name: comm_old
+    type: MPI_Comm
+  - name: nnodes
+    type: int
+  - elem_count: nnodes
+    name: index
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: index[nnodes-1]
+    name: edges
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - name: reorder
+    type: int
+  - name: comm_graph
+    type: MPI_Comm *
+  return_type: int
+MPI_Graph_get:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: maxindex
+    type: int
+  - name: maxedges
+    type: int
+  - elem_count: maxindex
+    name: index
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  - elem_count: maxedges
+    name: edges
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  return_type: int
+MPI_Graph_map:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: nnodes
+    type: int
+  - elem_count: nnodes
+    name: index
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: index[nnodes-1]
+    name: edges
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - name: newrank
+    type: int *
+  return_type: int
+MPI_Graph_neighbors:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: rank
+    type: int
+  - name: maxneighbors
+    type: int
+  - elem_count: maxneighbors
+    name: neighbors
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  return_type: int
+MPI_Graph_neighbors_count:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: rank
+    type: int
+  - name: nneighbors
+    type: int *
+  return_type: int
+MPI_Graphdims_get:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: nnodes
+    type: int *
+  - name: nedges
+    type: int *
+  return_type: int
+MPI_Grequest_complete:
+  params:
+  - name: request
+    type: MPI_Request
+  return_type: int
+MPI_Grequest_start:
+  params:
+  - name: query_fn
+    type: MPI_Grequest_query_function *
+  - name: free_fn
+    type: MPI_Grequest_free_function *
+  - name: cancel_fn
+    type: MPI_Grequest_cancel_function *
+  - name: extra_state
+    type: void *
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Group_compare:
+  params:
+  - name: group1
+    type: MPI_Group
+  - name: group2
+    type: MPI_Group
+  - name: result
+    type: int *
+  return_type: int
+MPI_Group_difference:
+  params:
+  - name: group1
+    type: MPI_Group
+  - name: group2
+    type: MPI_Group
+  - name: newgroup
+    type: MPI_Group *
+  return_type: int
+MPI_Group_excl:
+  params:
+  - name: group
+    type: MPI_Group
+  - name: n
+    type: int
+  - elem_count: n
+    name: ranks
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - name: newgroup
+    type: MPI_Group *
+  return_type: int
+MPI_Group_free:
+  params:
+  - name: group
+    type: MPI_Group *
+  return_type: int
+MPI_Group_incl:
+  params:
+  - name: group
+    type: MPI_Group
+  - name: n
+    type: int
+  - elem_count: n
+    name: ranks
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - name: newgroup
+    type: MPI_Group *
+  return_type: int
+MPI_Group_intersection:
+  params:
+  - name: group1
+    type: MPI_Group
+  - name: group2
+    type: MPI_Group
+  - name: newgroup
+    type: MPI_Group *
+  return_type: int
+MPI_Group_range_excl:
+  params:
+  - name: group
+    type: MPI_Group
+  - name: n
+    type: int
+  - elem_count: n
+    name: ranges
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[][3]
+  - name: newgroup
+    type: MPI_Group *
+  return_type: int
+MPI_Group_range_incl:
+  params:
+  - name: group
+    type: MPI_Group
+  - name: n
+    type: int
+  - elem_count: n
+    name: ranges
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[][3]
+  - name: newgroup
+    type: MPI_Group *
+  return_type: int
+MPI_Group_rank:
+  params:
+  - name: group
+    type: MPI_Group
+  - name: rank
+    type: int *
+  return_type: int
+MPI_Group_size:
+  params:
+  - name: group
+    type: MPI_Group
+  - name: size
+    type: int *
+  return_type: int
+MPI_Group_translate_ranks:
+  params:
+  - name: group1
+    type: MPI_Group
+  - name: n
+    type: int
+  - elem_count: n
+    name: ranks1
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - name: group2
+    type: MPI_Group
+  - elem_count: n
+    name: ranks2
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  return_type: int
+MPI_Group_union:
+  params:
+  - name: group1
+    type: MPI_Group
+  - name: group2
+    type: MPI_Group
+  - name: newgroup
+    type: MPI_Group *
+  return_type: int
+MPI_Iallgather:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - name: recvcount
+    type: int
+  - name: recvtype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Iallgatherv:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - elem_count: size
+    name: recvcounts
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: size
+    name: displs
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - name: recvtype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Iallreduce:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: recvbuf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: op
+    type: MPI_Op
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Ialltoall:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - name: recvcount
+    type: int
+  - name: recvtype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Ialltoallv:
+  params:
+  - name: sendbuf
+    type: const void *
+  - elem_count: size
+    name: sendcounts
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: size
+    name: sdispls
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - elem_count: size
+    name: recvcounts
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: size
+    name: rdispls
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - name: recvtype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Ialltoallw:
+  params:
+  - name: sendbuf
+    type: const void *
+  - elem_count: size
+    name: sendcounts
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: size
+    name: sdispls
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: size
+    name: sendtypes
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const MPI_Datatype[]
+  - name: recvbuf
+    type: void *
+  - elem_count: size
+    name: recvcounts
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: size
+    name: rdispls
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: size
+    name: recvtypes
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const MPI_Datatype[]
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Ibarrier:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Ibcast:
+  params:
+  - name: buffer
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: root
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Ibsend:
+  params:
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: dest
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Iexscan:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: recvbuf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: op
+    type: MPI_Op
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Igather:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - name: recvcount
+    type: int
+  - name: recvtype
+    type: MPI_Datatype
+  - name: root
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Igatherv:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - elem_count: size
+    name: recvcounts
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: size
+    name: displs
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - name: recvtype
+    type: MPI_Datatype
+  - name: root
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Improbe:
+  params:
+  - name: source
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: flag
+    type: int *
+  - name: message
+    type: MPI_Message *
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_Imrecv:
+  params:
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: type
+    type: MPI_Datatype
+  - name: message
+    type: MPI_Message *
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Ineighbor_allgather:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - name: recvcount
+    type: int
+  - name: recvtype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Ineighbor_allgatherv:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - elem_count: ideg
+    name: recvcounts
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: ideg
+    name: displs
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const int[]
+  - name: recvtype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Ineighbor_alltoall:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - name: recvcount
+    type: int
+  - name: recvtype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Ineighbor_alltoallv:
+  params:
+  - name: sendbuf
+    type: const void *
+  - elem_count: odeg
+    name: sendcounts
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: odeg
+    name: sdispls
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const int[]
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - elem_count: ideg
+    name: recvcounts
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: ideg
+    name: rdispls
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const int[]
+  - name: recvtype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Ineighbor_alltoallw:
+  params:
+  - name: sendbuf
+    type: const void *
+  - elem_count: odeg
+    name: sendcounts
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: odeg
+    name: sdispls
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const MPI_Aint[]
+  - elem_count: odeg
+    name: sendtypes
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const MPI_Datatype[]
+  - name: recvbuf
+    type: void *
+  - elem_count: ideg
+    name: recvcounts
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: ideg
+    name: rdispls
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const MPI_Aint[]
+  - elem_count: ideg
+    name: recvtypes
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const MPI_Datatype[]
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Info_create:
+  params:
+  - name: info
+    type: MPI_Info *
+  return_type: int
+MPI_Info_delete:
+  params:
+  - name: info
+    type: MPI_Info
+  - name: key
+    type: const char *
+  return_type: int
+MPI_Info_dup:
+  params:
+  - name: info
+    type: MPI_Info
+  - name: newinfo
+    type: MPI_Info *
+  return_type: int
+MPI_Info_free:
+  params:
+  - name: info
+    type: MPI_Info *
+  return_type: int
+MPI_Info_get:
+  params:
+  - name: info
+    type: MPI_Info
+  - name: key
+    type: const char *
+  - name: valuelen
+    type: int
+  - name: value
+    type: char *
+  - name: flag
+    type: int *
+  return_type: int
+MPI_Info_get_nkeys:
+  params:
+  - name: info
+    type: MPI_Info
+  - name: nkeys
+    type: int *
+  return_type: int
+MPI_Info_get_nthkey:
+  params:
+  - name: info
+    type: MPI_Info
+  - name: n
+    type: int
+  - name: key
+    type: char *
+  return_type: int
+MPI_Info_get_valuelen:
+  params:
+  - name: info
+    type: MPI_Info
+  - name: key
+    type: const char *
+  - name: valuelen
+    type: int *
+  - name: flag
+    type: int *
+  return_type: int
+MPI_Info_set:
+  params:
+  - name: info
+    type: MPI_Info
+  - name: key
+    type: const char *
+  - name: value
+    type: const char *
+  return_type: int
+MPI_Init:
+  params:
+  - name: argc
+    type: int *
+  - name: argv
+    type: char ***
+  return_type: int
+MPI_Init_thread:
+  params:
+  - name: argc
+    type: int *
+  - name: argv
+    type: char ***
+  - name: required
+    type: int
+  - name: provided
+    type: int *
+  return_type: int
+MPI_Initialized:
+  params:
+  - name: flag
+    type: int *
+  return_type: int
+MPI_Intercomm_create:
+  params:
+  - name: local_comm
+    type: MPI_Comm
+  - name: local_leader
+    type: int
+  - name: bridge_comm
+    type: MPI_Comm
+  - name: remote_leader
+    type: int
+  - name: tag
+    type: int
+  - name: newintercomm
+    type: MPI_Comm *
+  return_type: int
+MPI_Intercomm_merge:
+  params:
+  - name: intercomm
+    type: MPI_Comm
+  - name: high
+    type: int
+  - name: newintercomm
+    type: MPI_Comm *
+  return_type: int
+MPI_Iprobe:
+  params:
+  - name: source
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: flag
+    type: int *
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_Irecv:
+  params:
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: source
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Ireduce:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: recvbuf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: op
+    type: MPI_Op
+  - name: root
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Ireduce_scatter:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: recvbuf
+    type: void *
+  - elem_count: size
+    name: recvcounts
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - name: datatype
+    type: MPI_Datatype
+  - name: op
+    type: MPI_Op
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Ireduce_scatter_block:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: recvbuf
+    type: void *
+  - name: recvcount
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: op
+    type: MPI_Op
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Irsend:
+  params:
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: dest
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Is_thread_main:
+  params:
+  - name: flag
+    type: int *
+  return_type: int
+MPI_Iscan:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: recvbuf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: op
+    type: MPI_Op
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Iscatter:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - name: recvcount
+    type: int
+  - name: recvtype
+    type: MPI_Datatype
+  - name: root
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Iscatterv:
+  params:
+  - name: sendbuf
+    type: const void *
+  - elem_count: '(rank == root ? size : 0)'
+    name: sendcounts
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: '(rank == root ? size : 0)'
+    name: displs
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - name: recvcount
+    type: int
+  - name: recvtype
+    type: MPI_Datatype
+  - name: root
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Isend:
+  params:
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: dest
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Issend:
+  params:
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: dest
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Keyval_create:
+  params:
+  - name: copy_fn
+    type: MPI_Copy_function *
+  - name: delete_fn
+    type: MPI_Delete_function *
+  - name: keyval
+    type: int *
+  - name: extra_state
+    type: void *
+  return_type: int
+MPI_Keyval_free:
+  params:
+  - name: keyval
+    type: int *
+  return_type: int
+MPI_Lookup_name:
+  params:
+  - name: service_name
+    type: const char *
+  - name: info
+    type: MPI_Info
+  - name: port_name
+    type: char *
+  return_type: int
+MPI_Mprobe:
+  params:
+  - name: source
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: message
+    type: MPI_Message *
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_Mrecv:
+  params:
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: type
+    type: MPI_Datatype
+  - name: message
+    type: MPI_Message *
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_Neighbor_allgather:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - name: recvcount
+    type: int
+  - name: recvtype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Neighbor_allgatherv:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - elem_count: ideg
+    name: recvcounts
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: ideg
+    name: displs
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const int[]
+  - name: recvtype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Neighbor_alltoall:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - name: recvcount
+    type: int
+  - name: recvtype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Neighbor_alltoallv:
+  params:
+  - name: sendbuf
+    type: const void *
+  - elem_count: odeg
+    name: sendcounts
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: odeg
+    name: sdispls
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const int[]
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - elem_count: ideg
+    name: recvcounts
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: ideg
+    name: rdispls
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const int[]
+  - name: recvtype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Neighbor_alltoallw:
+  params:
+  - name: sendbuf
+    type: const void *
+  - elem_count: odeg
+    name: sendcounts
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: odeg
+    name: sdispls
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const MPI_Aint[]
+  - elem_count: odeg
+    name: sendtypes
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const MPI_Datatype[]
+  - name: recvbuf
+    type: void *
+  - elem_count: ideg
+    name: recvcounts
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: ideg
+    name: rdispls
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const MPI_Aint[]
+  - elem_count: ideg
+    name: recvtypes
+    prolog_elem_count: int ideg, odeg, wted; PMPI_Dist_graph_neighbors_count(comm,
+      &ideg, &odeg, &wted);
+    trace_each_elem: true
+    type: const MPI_Datatype[]
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Op_commutative:
+  params:
+  - name: op
+    type: MPI_Op
+  - name: commute
+    type: int *
+  return_type: int
+MPI_Op_create:
+  params:
+  - name: function
+    type: MPI_User_function *
+  - name: commute
+    type: int
+  - name: op
+    type: MPI_Op *
+  return_type: int
+MPI_Op_free:
+  params:
+  - name: op
+    type: MPI_Op *
+  return_type: int
+MPI_Open_port:
+  params:
+  - name: info
+    type: MPI_Info
+  - name: port_name
+    type: char *
+  return_type: int
+MPI_Pack:
+  params:
+  - name: inbuf
+    type: const void *
+  - name: incount
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: outbuf
+    type: void *
+  - name: outsize
+    type: int
+  - name: position
+    type: int *
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Pack_external:
+  params:
+  - elem_count: strlen(datarep)
+    name: datarep
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const char[]
+  - name: inbuf
+    type: const void *
+  - name: incount
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: outbuf
+    type: void *
+  - name: outsize
+    type: MPI_Aint
+  - name: position
+    type: MPI_Aint *
+  return_type: int
+MPI_Pack_external_size:
+  params:
+  - elem_count: strlen(datarep)
+    name: datarep
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const char[]
+  - name: incount
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: size
+    type: MPI_Aint *
+  return_type: int
+MPI_Pack_size:
+  params:
+  - name: incount
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  - name: size
+    type: int *
+  return_type: int
+MPI_Pcontrol:
+  params:
+  - name: level
+    type: const int
+  - name: '...'
+    type: ''
+  return_type: int
+MPI_Probe:
+  params:
+  - name: source
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_Publish_name:
+  params:
+  - name: service_name
+    type: const char *
+  - name: info
+    type: MPI_Info
+  - name: port_name
+    type: const char *
+  return_type: int
+MPI_Put:
+  params:
+  - name: origin_addr
+    type: const void *
+  - name: origin_count
+    type: int
+  - name: origin_datatype
+    type: MPI_Datatype
+  - name: target_rank
+    type: int
+  - name: target_disp
+    type: MPI_Aint
+  - name: target_count
+    type: int
+  - name: target_datatype
+    type: MPI_Datatype
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Query_thread:
+  params:
+  - name: provided
+    type: int *
+  return_type: int
+MPI_Raccumulate:
+  params:
+  - name: origin_addr
+    type: const void *
+  - name: origin_count
+    type: int
+  - name: origin_datatype
+    type: MPI_Datatype
+  - name: target_rank
+    type: int
+  - name: target_disp
+    type: MPI_Aint
+  - name: target_count
+    type: int
+  - name: target_datatype
+    type: MPI_Datatype
+  - name: op
+    type: MPI_Op
+  - name: win
+    type: MPI_Win
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Recv:
+  params:
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: source
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_Recv_init:
+  params:
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: source
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Reduce:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: recvbuf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: op
+    type: MPI_Op
+  - name: root
+    type: int
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Reduce_local:
+  params:
+  - name: inbuf
+    type: const void *
+  - name: inoutbuf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: op
+    type: MPI_Op
+  return_type: int
+MPI_Reduce_scatter:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: recvbuf
+    type: void *
+  - elem_count: size
+    name: recvcounts
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - name: datatype
+    type: MPI_Datatype
+  - name: op
+    type: MPI_Op
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Reduce_scatter_block:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: recvbuf
+    type: void *
+  - name: recvcount
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: op
+    type: MPI_Op
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Register_datarep:
+  params:
+  - name: datarep
+    type: const char *
+  - name: read_conversion_fn
+    type: MPI_Datarep_conversion_function *
+  - name: write_conversion_fn
+    type: MPI_Datarep_conversion_function *
+  - name: dtype_file_extent_fn
+    type: MPI_Datarep_extent_function *
+  - name: extra_state
+    type: void *
+  return_type: int
+MPI_Request_free:
+  params:
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Request_get_status:
+  params:
+  - name: request
+    type: MPI_Request
+  - name: flag
+    type: int *
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_Rget:
+  params:
+  - name: origin_addr
+    type: void *
+  - name: origin_count
+    type: int
+  - name: origin_datatype
+    type: MPI_Datatype
+  - name: target_rank
+    type: int
+  - name: target_disp
+    type: MPI_Aint
+  - name: target_count
+    type: int
+  - name: target_datatype
+    type: MPI_Datatype
+  - name: win
+    type: MPI_Win
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Rget_accumulate:
+  params:
+  - name: origin_addr
+    type: const void *
+  - name: origin_count
+    type: int
+  - name: origin_datatype
+    type: MPI_Datatype
+  - name: result_addr
+    type: void *
+  - name: result_count
+    type: int
+  - name: result_datatype
+    type: MPI_Datatype
+  - name: target_rank
+    type: int
+  - name: target_disp
+    type: MPI_Aint
+  - name: target_count
+    type: int
+  - name: target_datatype
+    type: MPI_Datatype
+  - name: op
+    type: MPI_Op
+  - name: win
+    type: MPI_Win
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Rput:
+  params:
+  - name: origin_addr
+    type: const void *
+  - name: origin_count
+    type: int
+  - name: origin_datatype
+    type: MPI_Datatype
+  - name: target_rank
+    type: int
+  - name: target_disp
+    type: MPI_Aint
+  - name: target_cout
+    type: int
+  - name: target_datatype
+    type: MPI_Datatype
+  - name: win
+    type: MPI_Win
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Rsend:
+  params:
+  - name: ibuf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: dest
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Rsend_init:
+  params:
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: dest
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Scan:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: recvbuf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: op
+    type: MPI_Op
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Scatter:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - name: recvcount
+    type: int
+  - name: recvtype
+    type: MPI_Datatype
+  - name: root
+    type: int
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Scatterv:
+  params:
+  - name: sendbuf
+    type: const void *
+  - elem_count: '(rank==root ? size : 0)'
+    name: sendcounts
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: '(rank==root ? size : 0)'
+    name: displs
+    prolog_elem_count: int rank, size; PMPI_Comm_size(comm, &size); PMPI_Comm_rank(comm,
+      &rank);
+    trace_each_elem: true
+    type: const int[]
+  - name: sendtype
+    type: MPI_Datatype
+  - name: recvbuf
+    type: void *
+  - name: recvcount
+    type: int
+  - name: recvtype
+    type: MPI_Datatype
+  - name: root
+    type: int
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Send:
+  params:
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: dest
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Send_init:
+  params:
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: dest
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Sendrecv:
+  params:
+  - name: sendbuf
+    type: const void *
+  - name: sendcount
+    type: int
+  - name: sendtype
+    type: MPI_Datatype
+  - name: dest
+    type: int
+  - name: sendtag
+    type: int
+  - name: recvbuf
+    type: void *
+  - name: recvcount
+    type: int
+  - name: recvtype
+    type: MPI_Datatype
+  - name: source
+    type: int
+  - name: recvtag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_Sendrecv_replace:
+  params:
+  - name: buf
+    type: void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: dest
+    type: int
+  - name: sendtag
+    type: int
+  - name: source
+    type: int
+  - name: recvtag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_Ssend:
+  params:
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: dest
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Ssend_init:
+  params:
+  - name: buf
+    type: const void *
+  - name: count
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: dest
+    type: int
+  - name: tag
+    type: int
+  - name: comm
+    type: MPI_Comm
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Start:
+  params:
+  - name: request
+    type: MPI_Request *
+  return_type: int
+MPI_Startall:
+  params:
+  - name: count
+    type: int
+  - elem_count: count
+    name: array_of_requests
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: MPI_Request[]
+  return_type: int
+MPI_Status_c2f:
+  params:
+  - name: c_status
+    type: const MPI_Status *
+  - name: f_status
+    type: int *
+  return_type: int
+MPI_Status_f2c:
+  params:
+  - name: f_status
+    type: const int *
+  - name: c_status
+    type: MPI_Status *
+  return_type: int
+MPI_Status_set_cancelled:
+  params:
+  - name: status
+    type: MPI_Status *
+  - name: flag
+    type: int
+  return_type: int
+MPI_Status_set_elements:
+  params:
+  - name: status
+    type: MPI_Status *
+  - name: datatype
+    type: MPI_Datatype
+  - name: count
+    type: int
+  return_type: int
+MPI_Status_set_elements_x:
+  params:
+  - name: status
+    type: MPI_Status *
+  - name: datatype
+    type: MPI_Datatype
+  - name: count
+    type: MPI_Count
+  return_type: int
+MPI_Test:
+  params:
+  - name: request
+    type: MPI_Request *
+  - name: flag
+    type: int *
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_Test_cancelled:
+  params:
+  - name: status
+    type: const MPI_Status *
+  - name: flag
+    type: int *
+  return_type: int
+MPI_Testall:
+  params:
+  - name: count
+    type: int
+  - elem_count: count
+    name: array_of_requests
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: MPI_Request[]
+  - name: flag
+    type: int *
+  - elem_count: count
+    name: array_of_statuses
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: MPI_Status[]
+  return_type: int
+MPI_Testany:
+  params:
+  - name: count
+    type: int
+  - elem_count: count
+    name: array_of_requests
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: MPI_Request[]
+  - name: index
+    type: int *
+  - name: flag
+    type: int *
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_Testsome:
+  params:
+  - name: incount
+    type: int
+  - elem_count: incount
+    name: array_of_requests
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: MPI_Request[]
+  - name: outcount
+    type: int *
+  - elem_count: '*outcount'
+    name: array_of_indices
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  - elem_count: '*outcount'
+    name: array_of_statuses
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: MPI_Status[]
+  return_type: int
+MPI_Topo_test:
+  params:
+  - name: comm
+    type: MPI_Comm
+  - name: status
+    type: int *
+  return_type: int
+MPI_Type_commit:
+  params:
+  - name: type
+    type: MPI_Datatype *
+  return_type: int
+MPI_Type_contiguous:
+  params:
+  - name: count
+    type: int
+  - name: oldtype
+    type: MPI_Datatype
+  - name: newtype
+    type: MPI_Datatype *
+  return_type: int
+MPI_Type_create_darray:
+  params:
+  - name: size
+    type: int
+  - name: rank
+    type: int
+  - name: ndims
+    type: int
+  - elem_count: ndims
+    name: gsize_array
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: ndims
+    name: distrib_array
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: ndims
+    name: darg_array
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: ndims
+    name: psize_array
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - name: order
+    type: int
+  - name: oldtype
+    type: MPI_Datatype
+  - name: newtype
+    type: MPI_Datatype *
+  return_type: int
+MPI_Type_create_f90_complex:
+  params:
+  - name: p
+    type: int
+  - name: r
+    type: int
+  - name: newtype
+    type: MPI_Datatype *
+  return_type: int
+MPI_Type_create_f90_integer:
+  params:
+  - name: r
+    type: int
+  - name: newtype
+    type: MPI_Datatype *
+  return_type: int
+MPI_Type_create_f90_real:
+  params:
+  - name: p
+    type: int
+  - name: r
+    type: int
+  - name: newtype
+    type: MPI_Datatype *
+  return_type: int
+MPI_Type_create_hindexed:
+  params:
+  - name: count
+    type: int
+  - elem_count: count
+    name: array_of_blocklengths
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: count
+    name: array_of_displacements
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const MPI_Aint[]
+  - name: oldtype
+    type: MPI_Datatype
+  - name: newtype
+    type: MPI_Datatype *
+  return_type: int
+MPI_Type_create_hindexed_block:
+  params:
+  - name: count
+    type: int
+  - name: blocklength
+    type: int
+  - elem_count: count
+    name: array_of_displacements
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const MPI_Aint[]
+  - name: oldtype
+    type: MPI_Datatype
+  - name: newtype
+    type: MPI_Datatype *
+  return_type: int
+MPI_Type_create_hvector:
+  params:
+  - name: count
+    type: int
+  - name: blocklength
+    type: int
+  - name: stride
+    type: MPI_Aint
+  - name: oldtype
+    type: MPI_Datatype
+  - name: newtype
+    type: MPI_Datatype *
+  return_type: int
+MPI_Type_create_indexed_block:
+  params:
+  - name: count
+    type: int
+  - name: blocklength
+    type: int
+  - elem_count: count
+    name: array_of_displacements
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - name: oldtype
+    type: MPI_Datatype
+  - name: newtype
+    type: MPI_Datatype *
+  return_type: int
+MPI_Type_create_keyval:
+  params:
+  - name: type_copy_attr_fn
+    type: MPI_Type_copy_attr_function *
+  - name: type_delete_attr_fn
+    type: MPI_Type_delete_attr_function *
+  - name: type_keyval
+    type: int *
+  - name: extra_state
+    type: void *
+  return_type: int
+MPI_Type_create_resized:
+  params:
+  - name: oldtype
+    type: MPI_Datatype
+  - name: lb
+    type: MPI_Aint
+  - name: extent
+    type: MPI_Aint
+  - name: newtype
+    type: MPI_Datatype *
+  return_type: int
+MPI_Type_create_struct:
+  params:
+  - name: count
+    type: int
+  - elem_count: count
+    name: array_of_block_lengths
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: count
+    name: array_of_displacements
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const MPI_Aint[]
+  - elem_count: count
+    name: array_of_types
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const MPI_Datatype[]
+  - name: newtype
+    type: MPI_Datatype *
+  return_type: int
+MPI_Type_create_subarray:
+  params:
+  - name: ndims
+    type: int
+  - elem_count: ndims
+    name: size_array
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: ndims
+    name: subsize_array
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: ndims
+    name: start_array
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - name: order
+    type: int
+  - name: oldtype
+    type: MPI_Datatype
+  - name: newtype
+    type: MPI_Datatype *
+  return_type: int
+MPI_Type_delete_attr:
+  params:
+  - name: type
+    type: MPI_Datatype
+  - name: type_keyval
+    type: int
+  return_type: int
+MPI_Type_dup:
+  params:
+  - name: type
+    type: MPI_Datatype
+  - name: newtype
+    type: MPI_Datatype *
+  return_type: int
+MPI_Type_free:
+  params:
+  - name: type
+    type: MPI_Datatype *
+  return_type: int
+MPI_Type_free_keyval:
+  params:
+  - name: type_keyval
+    type: int *
+  return_type: int
+MPI_Type_get_attr:
+  params:
+  - name: type
+    type: MPI_Datatype
+  - name: type_keyval
+    type: int
+  - name: attribute_val
+    type: void *
+  - name: flag
+    type: int *
+  return_type: int
+MPI_Type_get_contents:
+  params:
+  - name: mtype
+    type: MPI_Datatype
+  - name: max_integers
+    type: int
+  - name: max_addresses
+    type: int
+  - name: max_datatypes
+    type: int
+  - elem_count: max_integers
+    name: array_of_integers
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  - elem_count: max_addresses
+    name: array_of_addresses
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: MPI_Aint[]
+  - elem_count: max_datatypes
+    name: array_of_datatypes
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: MPI_Datatype[]
+  return_type: int
+MPI_Type_get_envelope:
+  params:
+  - name: type
+    type: MPI_Datatype
+  - name: num_integers
+    type: int *
+  - name: num_addresses
+    type: int *
+  - name: num_datatypes
+    type: int *
+  - name: combiner
+    type: int *
+  return_type: int
+MPI_Type_get_extent:
+  params:
+  - name: type
+    type: MPI_Datatype
+  - name: lb
+    type: MPI_Aint *
+  - name: extent
+    type: MPI_Aint *
+  return_type: int
+MPI_Type_get_extent_x:
+  params:
+  - name: type
+    type: MPI_Datatype
+  - name: lb
+    type: MPI_Count *
+  - name: extent
+    type: MPI_Count *
+  return_type: int
+MPI_Type_get_name:
+  params:
+  - name: type
+    type: MPI_Datatype
+  - name: type_name
+    type: char *
+  - name: resultlen
+    type: int *
+  return_type: int
+MPI_Type_get_true_extent:
+  params:
+  - name: datatype
+    type: MPI_Datatype
+  - name: true_lb
+    type: MPI_Aint *
+  - name: true_extent
+    type: MPI_Aint *
+  return_type: int
+MPI_Type_get_true_extent_x:
+  params:
+  - name: datatype
+    type: MPI_Datatype
+  - name: true_lb
+    type: MPI_Count *
+  - name: true_extent
+    type: MPI_Count *
+  return_type: int
+MPI_Type_indexed:
+  params:
+  - name: count
+    type: int
+  - elem_count: count
+    name: array_of_blocklengths
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - elem_count: count
+    name: array_of_displacements
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const int[]
+  - name: oldtype
+    type: MPI_Datatype
+  - name: newtype
+    type: MPI_Datatype *
+  return_type: int
+MPI_Type_match_size:
+  params:
+  - name: typeclass
+    type: int
+  - name: size
+    type: int
+  - name: type
+    type: MPI_Datatype *
+  return_type: int
+MPI_Type_set_attr:
+  params:
+  - name: type
+    type: MPI_Datatype
+  - name: type_keyval
+    type: int
+  - name: attr_val
+    type: void *
+  return_type: int
+MPI_Type_set_name:
+  params:
+  - name: type
+    type: MPI_Datatype
+  - name: type_name
+    type: const char *
+  return_type: int
+MPI_Type_size:
+  params:
+  - name: type
+    type: MPI_Datatype
+  - name: size
+    type: int *
+  return_type: int
+MPI_Type_size_x:
+  params:
+  - name: type
+    type: MPI_Datatype
+  - name: size
+    type: MPI_Count *
+  return_type: int
+MPI_Type_vector:
+  params:
+  - name: count
+    type: int
+  - name: blocklength
+    type: int
+  - name: stride
+    type: int
+  - name: oldtype
+    type: MPI_Datatype
+  - name: newtype
+    type: MPI_Datatype *
+  return_type: int
+MPI_Unpack:
+  params:
+  - name: inbuf
+    type: const void *
+  - name: insize
+    type: int
+  - name: position
+    type: int *
+  - name: outbuf
+    type: void *
+  - name: outcount
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  - name: comm
+    type: MPI_Comm
+  return_type: int
+MPI_Unpack_external:
+  params:
+  - elem_count: strlen(datarep)
+    name: datarep
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: const char[]
+  - name: inbuf
+    type: const void *
+  - name: insize
+    type: MPI_Aint
+  - name: position
+    type: MPI_Aint *
+  - name: outbuf
+    type: void *
+  - name: outcount
+    type: int
+  - name: datatype
+    type: MPI_Datatype
+  return_type: int
+MPI_Unpublish_name:
+  params:
+  - name: service_name
+    type: const char *
+  - name: info
+    type: MPI_Info
+  - name: port_name
+    type: const char *
+  return_type: int
+MPI_Wait:
+  params:
+  - name: request
+    type: MPI_Request *
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_Waitall:
+  params:
+  - name: count
+    type: int
+  - elem_count: '(array_of_statuses != MPI_STATUSES_IGNORE ? count : 0)'
+    name: array_of_requests
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: MPI_Request[]
+  - name: array_of_statuses
+    type: MPI_Status *
+  return_type: int
+MPI_Waitany:
+  params:
+  - name: count
+    type: int
+  - elem_count: count
+    name: array_of_requests
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: MPI_Request[]
+  - name: index
+    type: int *
+  - name: status
+    type: MPI_Status *
+  return_type: int
+MPI_Waitsome:
+  params:
+  - name: incount
+    type: int
+  - elem_count: incount
+    name: array_of_requests
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: MPI_Request[]
+  - name: outcount
+    type: int *
+  - elem_count: '*outcount'
+    name: array_of_indices
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: int[]
+  - elem_count: '(array_of_statuses != MPI_STATUSES_IGNORE ? *outcount : 0)'
+    name: array_of_statuses
+    prolog_elem_count: null
+    trace_each_elem: true
+    type: MPI_Status[]
+  return_type: int
+MPI_Win_allocate:
+  params:
+  - name: size
+    type: MPI_Aint
+  - name: disp_unit
+    type: int
+  - name: info
+    type: MPI_Info
+  - name: comm
+    type: MPI_Comm
+  - name: baseptr
+    type: void *
+  - name: win
+    type: MPI_Win *
+  return_type: int
+MPI_Win_allocate_shared:
+  params:
+  - name: size
+    type: MPI_Aint
+  - name: disp_unit
+    type: int
+  - name: info
+    type: MPI_Info
+  - name: comm
+    type: MPI_Comm
+  - name: baseptr
+    type: void *
+  - name: win
+    type: MPI_Win *
+  return_type: int
+MPI_Win_attach:
+  params:
+  - name: win
+    type: MPI_Win
+  - name: base
+    type: void *
+  - name: size
+    type: MPI_Aint
+  return_type: int
+MPI_Win_call_errhandler:
+  params:
+  - name: win
+    type: MPI_Win
+  - name: errorcode
+    type: int
+  return_type: int
+MPI_Win_complete:
+  params:
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Win_create:
+  params:
+  - name: base
+    type: void *
+  - name: size
+    type: MPI_Aint
+  - name: disp_unit
+    type: int
+  - name: info
+    type: MPI_Info
+  - name: comm
+    type: MPI_Comm
+  - name: win
+    type: MPI_Win *
+  return_type: int
+MPI_Win_create_dynamic:
+  params:
+  - name: info
+    type: MPI_Info
+  - name: comm
+    type: MPI_Comm
+  - name: win
+    type: MPI_Win *
+  return_type: int
+MPI_Win_create_errhandler:
+  params:
+  - name: function
+    type: MPI_Win_errhandler_function *
+  - name: errhandler
+    type: MPI_Errhandler *
+  return_type: int
+MPI_Win_create_keyval:
+  params:
+  - name: win_copy_attr_fn
+    type: MPI_Win_copy_attr_function *
+  - name: win_delete_attr_fn
+    type: MPI_Win_delete_attr_function *
+  - name: win_keyval
+    type: int *
+  - name: extra_state
+    type: void *
+  return_type: int
+MPI_Win_delete_attr:
+  params:
+  - name: win
+    type: MPI_Win
+  - name: win_keyval
+    type: int
+  return_type: int
+MPI_Win_detach:
+  params:
+  - name: win
+    type: MPI_Win
+  - name: base
+    type: const void *
+  return_type: int
+MPI_Win_fence:
+  params:
+  - name: assert
+    type: int
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Win_flush:
+  params:
+  - name: rank
+    type: int
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Win_flush_all:
+  params:
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Win_flush_local:
+  params:
+  - name: rank
+    type: int
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Win_flush_local_all:
+  params:
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Win_free:
+  params:
+  - name: win
+    type: MPI_Win *
+  return_type: int
+MPI_Win_free_keyval:
+  params:
+  - name: win_keyval
+    type: int *
+  return_type: int
+MPI_Win_get_attr:
+  params:
+  - name: win
+    type: MPI_Win
+  - name: win_keyval
+    type: int
+  - name: attribute_val
+    type: void *
+  - name: flag
+    type: int *
+  return_type: int
+MPI_Win_get_errhandler:
+  params:
+  - name: win
+    type: MPI_Win
+  - name: errhandler
+    type: MPI_Errhandler *
+  return_type: int
+MPI_Win_get_group:
+  params:
+  - name: win
+    type: MPI_Win
+  - name: group
+    type: MPI_Group *
+  return_type: int
+MPI_Win_get_info:
+  params:
+  - name: win
+    type: MPI_Win
+  - name: info_used
+    type: MPI_Info *
+  return_type: int
+MPI_Win_get_name:
+  params:
+  - name: win
+    type: MPI_Win
+  - name: win_name
+    type: char *
+  - name: resultlen
+    type: int *
+  return_type: int
+MPI_Win_lock:
+  params:
+  - name: lock_type
+    type: int
+  - name: rank
+    type: int
+  - name: assert
+    type: int
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Win_lock_all:
+  params:
+  - name: assert
+    type: int
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Win_post:
+  params:
+  - name: group
+    type: MPI_Group
+  - name: assert
+    type: int
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Win_set_attr:
+  params:
+  - name: win
+    type: MPI_Win
+  - name: win_keyval
+    type: int
+  - name: attribute_val
+    type: void *
+  return_type: int
+MPI_Win_set_errhandler:
+  params:
+  - name: win
+    type: MPI_Win
+  - name: errhandler
+    type: MPI_Errhandler
+  return_type: int
+MPI_Win_set_info:
+  params:
+  - name: win
+    type: MPI_Win
+  - name: info
+    type: MPI_Info
+  return_type: int
+MPI_Win_set_name:
+  params:
+  - name: win
+    type: MPI_Win
+  - name: win_name
+    type: const char *
+  return_type: int
+MPI_Win_shared_query:
+  params:
+  - name: win
+    type: MPI_Win
+  - name: rank
+    type: int
+  - name: size
+    type: MPI_Aint *
+  - name: disp_unit
+    type: int *
+  - name: baseptr
+    type: void *
+  return_type: int
+MPI_Win_start:
+  params:
+  - name: group
+    type: MPI_Group
+  - name: assert
+    type: int
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Win_sync:
+  params:
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Win_test:
+  params:
+  - name: win
+    type: MPI_Win
+  - name: flag
+    type: int *
+  return_type: int
+MPI_Win_unlock:
+  params:
+  - name: rank
+    type: int
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Win_unlock_all:
+  params:
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Win_wait:
+  params:
+  - name: win
+    type: MPI_Win
+  return_type: int
+MPI_Wtick:
+  params: []
+  return_type: double
+MPI_Wtime:
+  params: []
+  return_type: double
