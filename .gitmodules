@@ -1,0 +1,3 @@
+[submodule "goal_gen/storage/DirectDriveSim"]
+	path = goal_gen/storage/DirectDriveSim
+	url = https://github.com/TrimVis/DirectDriveSim.git
