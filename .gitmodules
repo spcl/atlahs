@@ -1,3 +1,6 @@
 [submodule "goal_gen/storage/DirectDriveSim"]
 	path = goal_gen/storage/DirectDriveSim
 	url = https://github.com/TrimVis/DirectDriveSim.git
+[submodule "goal_gen/ai/nccl_nvtx_v2.20.5"]
+	path = goal_gen/ai/nccl_nvtx_v2.20.5
+	url = https://github.com/ZhiyiHu1999/nccl_nvtx_v2.20.5-1.git

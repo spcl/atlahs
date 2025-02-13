@@ -1,0 +1,4 @@
+num_of_nodes: 4
+num_gpus_per_node: 1
+
+# num_gpus_list: [1, 1, 1, 1]
