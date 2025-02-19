@@ -4,3 +4,15 @@
 [submodule "goal_gen/ai/nccl_nvtx_v2.20.5"]
 	path = goal_gen/ai/nccl_nvtx_v2.20.5
 	url = https://github.com/ZhiyiHu1999/nccl_nvtx_v2.20.5-1.git
+[submodule "apps/hpc/hpcg"]
+	path = apps/hpc/hpcg
+	url = https://github.com/hpcg-benchmark/hpcg.git
+[submodule "apps/hpc/lulesh"]
+	path = apps/hpc/lulesh
+	url = https://github.com/LLNL/LULESH.git
+[submodule "apps/hpc/lammps"]
+	path = apps/hpc/lammps
+	url = https://github.com/lammps/lammps.git
+[submodule "apps/hpc/milc_qcd"]
+	path = apps/hpc/milc_qcd
+	url = https://github.com/milc-qcd/milc_qcd.git
