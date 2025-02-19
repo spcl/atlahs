@@ -16,3 +16,6 @@
 [submodule "apps/hpc/milc_qcd"]
 	path = apps/hpc/milc_qcd
 	url = https://github.com/milc-qcd/milc_qcd.git
+[submodule "apps/hpc/icon"]
+	path = apps/hpc/icon
+	url = https://gitlab.dkrz.de/icon/icon-model.git
