@@ -1,0 +1,26 @@
+prompt 0
+nflavors1 4
+nflavors2 4
+nx 16
+ny 16
+nz 16
+nt 16
+iseed 5682304
+
+warms 0
+trajecs 1
+traj_between_meas 1
+beta 7.00
+mass1 0.1
+mass2 0.1
+u0   0.8441
+microcanonical_time_step 0.02
+steps_per_trajectory 4
+max_cg_iterations 100
+max_cg_restarts 5
+error_per_site .000005
+error_for_propagator .000002
+npbp_reps 1
+prec_pbp 1
+reload_parallel /capstor/scratch/cscs/sshen/workspace/atlahs/apps/hpc/milc_qcd/lattices/16x16x16x16.chklat
+forget

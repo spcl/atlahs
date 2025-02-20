@@ -19,3 +19,15 @@
 [submodule "apps/hpc/icon"]
 	path = apps/hpc/icon
 	url = https://gitlab.dkrz.de/icon/icon-model.git
+[submodule "apps/hpc/deps/hdf5"]
+	path = apps/hpc/deps/hdf5
+	url = https://github.com/HDFGroup/hdf5.git
+[submodule "apps/hpc/deps/netcdf-c"]
+	path = apps/hpc/deps/netcdf-c
+	url = https://github.com/Unidata/netcdf-c.git
+[submodule "apps/hpc/deps/netcdf-fortran"]
+	path = apps/hpc/deps/netcdf-fortran
+	url = https://github.com/Unidata/netcdf-fortran.git
+[submodule "sim/htsim"]
+	path = sim/htsim
+	url = https://github.com/spcl/HTSIM.git
