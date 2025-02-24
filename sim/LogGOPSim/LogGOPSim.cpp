@@ -160,7 +160,7 @@ int main(int argc, char **argv) {
   const int O=args_info.LogGOPS_O_arg;
   const int g=args_info.LogGOPS_g_arg;
   const int L=args_info.LogGOPS_L_arg;
-  const int G=args_info.LogGOPS_G_arg;
+  const double G=args_info.LogGOPS_G_arg;
   print=args_info.verbose_given;
   const uint32_t S=args_info.LogGOPS_S_arg;
   // if (args_info.comm_dep_file_given)
@@ -172,7 +172,7 @@ int main(int argc, char **argv) {
   const int ncpus = parser.GetNumCPU();
   const int nnics = parser.GetNumNIC();
 
-  printf("size: %i (%i CPUs, %i NICs); L=%i, o=%i g=%i, G=%i, O=%i, P=%i, S=%u\n", 
+  printf("size: %i (%i CPUs, %i NICs); L=%i, o=%i g=%i, G=%f, O=%i, P=%i, S=%u\n", 
          p, ncpus, nnics, L, o, g, G, O, p, S);
 
   TimelineVisualization tlviz(&args_info, p);
@@ -331,10 +331,14 @@ int main(int argc, char **argv) {
           parser.schedules[elem.host].MarkNodeAsStarted(elem.offset);
           check_hosts.push_back(elem.host);
           
+          // FIXME: this is a hack to make sure that the size is at least 1
+          if (elem.size == 0)
+            elem.size = 1;
+          assert(elem.size > 0);
           // check if OS Noise occurred
           btime_t noise = osnoise.get_noise(elem.host, elem.time, elem.time+o);
           nexto[elem.host][elem.proc] = elem.time + o + (elem.size-1)*O+ noise;
-          nextgs[elem.host][elem.nic] = elem.time + g +(elem.size-1)*G; // TODO: G should be charged in network layer only
+          nextgs[elem.host][elem.nic] = elem.time + g + static_cast<uint64_t>((elem.size-1)*G); // TODO: G should be charged in network layer only
           tlviz.add_osend(elem.host, elem.time, elem.time+o+ (elem.size-1)*O, elem.proc);
           tlviz.add_noise(elem.host, elem.time+o+ (elem.size-1)*O, elem.time + o + (elem.size-1)*O+ noise, elem.proc);
 
@@ -464,11 +468,16 @@ int main(int argc, char **argv) {
 		    if((earliestfinish = net.query(elem.starttime, elem.time, elem.target, elem.host, elem.size, &elem.handle)) <= elem.time /* msg made it through network */ &&
            std::max(nexto[elem.host][elem.proc],nextgr[elem.host][elem.nic]) <= elem.time /* local o,g available! */) { 
           if(print) printf("-- msg o,g available (nexto: %lu, nextgr: %lu)\n", (long unsigned int) nexto[elem.host][elem.proc], (long unsigned int) nextgr[elem.host][elem.nic]);
+          
+          if (elem.size == 0)
+            elem.size = 1;
+          
+          assert(elem.size > 0);
           // check if OS Noise occurred
           btime_t noise = osnoise.get_noise(elem.host, elem.time, elem.time+o);
-          nexto[elem.host][elem.proc] = elem.time+o+noise+std::max((elem.size-1)*O,(elem.size-1)*G) /* message is only received after G is charged !! TODO: consuming o seems a bit odd in the LogGP model but well in practice */;
-          nextgr[elem.host][elem.nic] = elem.time+g+(elem.size-1)*G;
-          
+          nexto[elem.host][elem.proc] = elem.time+o+noise+std::max((elem.size-1)*O, static_cast<uint64_t>((elem.size-1)*G)) /* message is only received after G is charged !! TODO: consuming o seems a bit odd in the LogGP model but well in practice */;
+          // std::cout << "[DEBUG] Actual time: " << nexto[elem.host][elem.proc] << std::endl;
+          nextgr[elem.host][elem.nic] = elem.time + g + static_cast<uint64_t>((elem.size-1)*G);
           // UPDATE the maximum RQ size
           if( args_info.qstat_given ){
             rq_max[elem.host] = std::max((int)rq[elem.host].size(), rq_max[elem.host]);
@@ -517,8 +526,11 @@ int main(int argc, char **argv) {
               if(print) printf("-- satisfy remote requires on host %i\n", elem.target);
             }
             tlviz.add_transmission(elem.target, elem.host, elem.starttime+o, elem.time, elem.size, G);
-            tlviz.add_orecv(elem.host, elem.time+(elem.size-1)*G-(elem.size-1)*O, elem.time+o+std::max((elem.size-1)*O,(elem.size-1)*G), elem.proc);
-            tlviz.add_noise(elem.host, elem.time+o+std::max((elem.size-1)*O,(elem.size-1)*G), elem.time+o+noise+std::max((elem.size-1)*O,(elem.size-1)*G), elem.proc);
+            tlviz.add_orecv(elem.host, elem.time+ static_cast<uint64_t>((elem.size-1)*G)-(elem.size-1)*O,
+                            elem.time+o+std::max((elem.size-1)*O, static_cast<uint64_t>((elem.size-1)*G)), elem.proc);
+            tlviz.add_noise(elem.host,
+                            elem.time + o + std::max((elem.size-1) * O, static_cast<uint64_t>((elem.size - 1) * G)),
+                            elem.time + o + noise + std::max((elem.size-1)*O, static_cast<uint64_t>((elem.size - 1) * G)), elem.proc);
             // satisfy local requires
             parser.schedules[elem.host].MarkNodeAsDone(matched_elem.offset);
             check_hosts.push_back(elem.host);

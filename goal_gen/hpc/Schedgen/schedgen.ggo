@@ -1,0 +1,28 @@
+package "schedgen" 
+version "0.1"
+
+option "ptrn"        p "Name of the communication pattern that should be used to generate a schedule"
+							values="binomialtreereduce","binarytreebcast","binomialtreebcast","nwaydissemination","pipelinedring","pipelinedringdep","doublering","gather","scatter","linbarrier","trace","dissemination","random_bisect","random_bisect_fd_sym","linear_alltoall","linear_alltoallv","allreduce_recdoub","allreduce_ring","resnet152","chained_dissem"
+							default="binomialtreebcast" string optional
+option "commsize"    s "Number of nodes that should be used in the communication pattern" default="8" int optional
+option "timemult"    - "Time multiplier, relative to microsecond (e.g., nanoseconds -> 1000)" default="1000" int optional
+option "datasize"    d "Number of bytes that are transmitted in the communication patttern in a basic step" default="1" int optional
+option "filename"    o "Filename for the name of the generated schedule" default="schedule.goal" string optional
+option "nway"        - "Fanout for the n-way dissemination pattern" default="1" int optional
+option "root"        - "Root node for certain patterns" default="0" int optional
+option "segmentsize" - "Segment size for pipelined pattern" default="1" int optional
+option "nb" - "nonblocking execution of collectives (provide length of local operation)" default="0" int optional
+option "nb-poll" - "polling interval for nonblocking execution" default="0" int optional
+option "cpu" - "select CPU to execute computation" default="0" int optional
+option "rpl-dep-cmp" - "replaces dependencies with fixed computation (parameter represents computation time. If -1, does not replace dependencies.)" default="-1" int optional
+option "a2av-skew-ratio" - "In the alltoallv pattern, each chunk of data sent by each rank is of a random size. The size of the chunk with id 'root' is of size 'datasize'. All the other chunks are of random size, and a2av-skew-ratio times smaller." default="1" int optional
+option "outcast" - "Generates outcast in the alltoallv pattern." flag off
+option "traces"      - "Tracefile for rank 0 (others are autodetected)" string optional
+option "traces-start" - "file with start lines in trace files (is updated after run if trace-nops is given)" string optional
+option "traces-nops" - "number of operations to write to file (0=all)" default="0" int optional
+option "traces-extr" - "extrapolation factor for traces" default="1" int optional
+option "traces-print" - "print each operation" default="0" int optional
+option "traces-nop2p" - "do not consider point-to-point communication" flag off
+option "traces-nocolls" - "do not consider collective communication" flag off
+option "traces-nbcify" - "turn blocking collectives into non-blocking colls, time to pre-post NBCs" default="0" int optional
+

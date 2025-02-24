@@ -7,7 +7,7 @@ option "save-mem"       -  "Map the schedules as MAP_SHARED to enable processing
 option "LogGOPS_L"        L  "The latency parameter L in the LogGP model" int default="2500" optional
 option "LogGOPS_o"        o  "The overhead parameter o in the LogGP model" int default="1500" optional
 option "LogGOPS_g"        g  "The gap per message parameter g in the LogGP model" int default="1000" optional
-option "LogGOPS_G"        G  "The gap per byte parameter G in the LogGP model" int default="6" optional
+option "LogGOPS_G"        G  "The gap per byte parameter G in the LogGP model" double default="6" optional
 option "LogGOPS_S"        S  "Datasize at which we change from eager to rendezvous protocol" int  default="65535" optional
 option "LogGOPS_O"	      O  "The overhead per byte in LogGOP" int default="0" optional
 #option "starttimes"    t  "Name of an output file from a previous run, the end times of the old simulation will be the starttime of this one" string optional
