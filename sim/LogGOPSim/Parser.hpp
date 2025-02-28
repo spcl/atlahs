@@ -52,6 +52,7 @@ struct DeserializedNode {
 	uint8_t            Proc;
 	uint8_t            Nic;
 	uint32_t           offset;
+	uint64_t		   start_time;
 	std::vector<uint32_t> DependOnMe;
 	std::vector<uint32_t> StartDependOnMe;
 };
@@ -435,6 +436,13 @@ class SerializedGraph {
 
 	std::vector<DeserializedNode> executableNodes;
 
+	// A hashmap that maps the offset of a node to the timestamp
+	// at which it should start. This is updated every time
+	// `MarkNodeAsStarted()` is called. In `MarkNodeAsDone()`,
+	// a timestamp is passed to the function, which is then
+	// used to update the `node_start_time` hashmap.
+	std::map<uint32_t, uint64_t> node_start_time;
+
 
 
 	void add_root_nodes() {
@@ -507,6 +515,7 @@ class SerializedGraph {
 			
 		return N;
 	}
+
 
 	public:
 
@@ -611,8 +620,9 @@ class SerializedGraph {
 			}
 		}
 	}
-		
-	void MarkNodeAsDone_DSN(DeserializedNode node) {
+	
+	void MarkNodeAsDone_DSN(DeserializedNode node)
+	{
 		
 		DeserializedNode N = get_node_by_offset(node.offset);
 		for (uint32_t cnt=0; cnt<N.DependOnMe.size(); cnt++) {
@@ -649,6 +659,7 @@ class SerializedGraph {
 			gp.tag = executableNodes[cnt].Tag;
 			gp.proc = executableNodes[cnt].Proc;
 			gp.nic = executableNodes[cnt].Nic;
+			gp.starttime = executableNodes[cnt].start_time;
 			if (executableNodes[cnt].Type == OPTYPE_SEND) gp.type = OP_SEND;
 			else if (executableNodes[cnt].Type == OPTYPE_RECV) gp.type = OP_RECV;
 			else if (executableNodes[cnt].Type == OPTYPE_CALC) gp.type = OP_LOCOP;
@@ -673,8 +684,16 @@ class SerializedGraph {
 			}
 		}
 	}
-		
-	void MarkNodeAsDone(uint32_t offset) {
+	
+	/**
+	 * Mark a node as done. This means that all nodes that depend on this node which
+	 * do not have any other dependencies can be executed now.
+	 * @param offset The offset of the node that is done
+	 * @param cpu_time The timestamp of the CPU that executed the node specified
+	 * by the offset
+	 */
+	void MarkNodeAsDone(uint32_t offset, uint64_t cpu_time)
+	{
 		
 		DeserializedNode N = get_node_by_offset(offset);
 		// std::cout << "[INFO] " << "Host: " << my_rank << ", Node " << offset << " has " << N.DependOnMe.size() << " dependencies" << std::endl;
@@ -684,9 +703,24 @@ class SerializedGraph {
 			int SIZEOF_NODE_INFO = sizeof(char) + sizeof(uint64_t) + sizeof(uint32_t)*7 + sizeof(uint8_t)*2;
 			uint32_t* dep_cnt = (uint32_t*) (mapping_start + sizeof(uint32_t)*2 + sizeof(uint32_t)*num_root_nodes + SIZEOF_NODE_INFO*offset);
 			(*dep_cnt)--;
+			// Checks if offset is in node_start_time
+			if (node_start_time.find(offset) == node_start_time.end())
+			{
+				node_start_time[offset] = cpu_time;
+			}
+			else
+			{
+				node_start_time[offset] = std::max(node_start_time[offset], cpu_time);
+			}
+
 			// std::cout << "[INFO] " << "Host: " << my_rank << ", Node " << offset << " has " << *dep_cnt << " dependencies left" << std::endl;
-			if ((*dep_cnt) == 0) {
-				executableNodes.push_back(get_node_by_offset(offset));
+			if ((*dep_cnt) == 0) 
+			{
+				DeserializedNode freed = get_node_by_offset(offset);
+				freed.start_time = node_start_time[offset];
+				// Remove the node offset from `node_start_time`
+				node_start_time.erase(offset);
+				executableNodes.push_back(freed);
 			}
 		}
 	}

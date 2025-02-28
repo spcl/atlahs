@@ -56,12 +56,14 @@ gengetopt_args_info args_info;
 typedef struct {
   // TODO: src and tag can go in case of hashmap matching
   btime_t starttime; // only for visualization
-  uint32_t size, src, tag, offset;
+  uint32_t size, src, tag, offset, proc;
 } ruqelem_t;
 
 typedef unsigned int uint;
 typedef unsigned long int ulint;
 typedef unsigned long long int ullint;
+
+int debug_count = 0;
 
 #ifdef LIST_MATCH
 // TODO this is really slow - reconsider design of rq and uq!
@@ -72,7 +74,6 @@ static inline int match(const graph_node_properties &elem, ruq_t *q, ruqelem_t *
 
   // MATCH attempts (i.e., number of elements searched to find a matching element)
   int match_attempts = 0;
-  
   //std::cout << "UQ size " << q->size() << "\n";
 
   if(print)
@@ -295,24 +296,44 @@ int main(int argc, char **argv) {
     // the lists of hosts that actually finished someting -- a host is
     // added whenever an irequires or requires is satisfied
     std::vector<int> check_hosts;
-
+    // print = 1;
     /*if(elem.host == 0) print = 1;
     else print = 0;*/
 
     // the BIG switch on element type that we just found 
+
+    // Checks the process 73 time on all hosts
+    // for (int i = 2; i < p; i++)
+    // {
+    //   if (elem.proc == 73 && elem.time >= 1e9)
+    //     std::cout << "[DEBUG] START ITER HOST: " << i << " cpu: 73 NextO: " << nexto[i][73] / 1e9 << " NextGr: " << nextgr[i][0] / 1e9 << " NextGs: " << nextgs[i][0] / 1e9 << " AQ size: " << aq.size() << std::endl;
+    //   // Find the maximum time for all CPUs on a host
+    //   // uint64_t max_time = *(max_element(nexto[i].begin(), nexto[i].end()));
+    //   // std::cout << "[DEBUG] START ITER HOST: " << i << " Max O: " << max_time / 1e9 << " NextGr: " << nextgr[i][0] / 1e9 << " NextGs: " << nextgs[i][0] / 1e9 << std::endl;
+    //   // std::cout << "[DEBUG] Curr elem time: " << elem.time / 1e9 << std::endl;
+    //   if (nexto[i][73] >= 30 * 1e9)
+    //   {
+    //     std::cout << "[DEBUG] Curr elem time: " << elem.time / 1e9 << std::endl;
+    //     exit(0);
+    //   }
+    // }
     switch(elem.type) {
       case OP_LOCOP: {
         if(print) printf("[%i] found loclop of length %lu - t: %lu (CPU: %i)\n", elem.host, (ulint)elem.size, (ulint)elem.time, elem.proc);
         if(nexto[elem.host][elem.proc] <= elem.time) {
           // check if OS Noise occurred
           btime_t noise = osnoise.get_noise(elem.host, elem.time, elem.time+elem.size);
-          nexto[elem.host][elem.proc] = elem.time+elem.size+noise;
+          uint64_t cpu_time = elem.time + elem.size + noise;
+          nexto[elem.host][elem.proc] = cpu_time;
+
+          if (print)
+            printf("-- nexto[%i][%i] = %lu\n", elem.host, elem.proc, nexto[elem.host][elem.proc]);
           // satisfy irequires
           //parser.schedules[elem.host].issue_node(elem.node);
           // satisfy requires+irequires
           //parser.schedules[elem.host].remove_node(elem.node);
           parser.schedules[elem.host].MarkNodeAsStarted(elem.offset);
-          parser.schedules[elem.host].MarkNodeAsDone(elem.offset);
+          parser.schedules[elem.host].MarkNodeAsDone(elem.offset, cpu_time);
           check_hosts.push_back(elem.host);
           // add to timeline
           tlviz.add_loclop(elem.host, elem.time, elem.time+elem.size, elem.proc);
@@ -329,16 +350,28 @@ int main(int argc, char **argv) {
         if(std::max(nexto[elem.host][elem.proc],nextgs[elem.host][elem.nic]) <= elem.time) { // local o,g available!
           if(print) printf("-- satisfy local irequires\n");
           parser.schedules[elem.host].MarkNodeAsStarted(elem.offset);
-          check_hosts.push_back(elem.host);
-          
+          check_hosts.push_back(elem.host);          
           // FIXME: this is a hack to make sure that the size is at least 1
           if (elem.size == 0)
             elem.size = 1;
+          
           assert(elem.size > 0);
           // check if OS Noise occurred
           btime_t noise = osnoise.get_noise(elem.host, elem.time, elem.time+o);
-          nexto[elem.host][elem.proc] = elem.time + o + (elem.size-1)*O+ noise;
-          nextgs[elem.host][elem.nic] = elem.time + g + static_cast<uint64_t>((elem.size-1)*G); // TODO: G should be charged in network layer only
+          uint64_t cpu_time = elem.time + o + noise + (elem.size-1) * O;
+          // nexto[elem.host][elem.proc] = elem.time + o + (elem.size-1)*O+ noise;
+          nexto[elem.host][elem.proc] = cpu_time;
+          
+          // std::cout << "[DEBUG] HOST: " << elem.host << " Send offset: " << elem.offset << " cpu: " << unsigned(elem.proc) << " Time: " << elem.time / 1e9 << " Size (b): " << elem.size << " NextO: " << nexto[elem.host][elem.proc] / 1e9 << std::endl;
+          uint64_t bandwidth_cost = static_cast<uint64_t>((elem.size-1) * G);
+          nextgs[elem.host][elem.nic] = elem.time + g + bandwidth_cost; // TODO: G should be charged in network layer only
+          
+          uint64_t host_time = nexto[elem.host][elem.proc];
+
+          if (print)
+            printf("-- nexto[%i][%i] = %lu, nextgs[%i][%i] = %lu\n", elem.host, elem.proc, nexto[elem.host][elem.proc], elem.host, elem.nic, nextgs[elem.host][elem.nic]);
+          
+          
           tlviz.add_osend(elem.host, elem.time, elem.time+o+ (elem.size-1)*O, elem.proc);
           tlviz.add_noise(elem.host, elem.time+o+ (elem.size-1)*O, elem.time + o + (elem.size-1)*O+ noise, elem.proc);
 
@@ -350,18 +383,20 @@ int main(int argc, char **argv) {
           elem.host = elem.target;
           elem.target = h;
           elem.starttime = elem.time;
-          elem.time = elem.time+o+L; // arrival time of first byte only (G will be charged at receiver ... +(elem.size-1)*G; // arrival time
+          // arrival time of first byte only (G will be charged at receiver ... +(elem.size-1)*G; // arrival time
+          elem.time = host_time + L + bandwidth_cost;
+
 #ifdef STRICT_ORDER
           num_events++; // MSG is a new event
           elem.ts = aqtime++; // new element in queue 
 #endif
-          if(print) printf("-- [%i] send inserting msg to %i, t: %lu\n", h, elem.host, (ulint)elem.time);
+          if(print) printf("-- [%i] send inserting msg to %i, t: %lu\n", h, elem.host, elem.time);
           aq.push(elem);
 
           if(elem.size <= S) { // eager message
             if(print) printf("-- [%i] eager -- satisfy local requires at t: %lu\n", h, (long unsigned int) elem.starttime+o);
             // satisfy local requires (host and target swapped!) 
-            parser.schedules[h].MarkNodeAsDone(elem.offset);
+            parser.schedules[h].MarkNodeAsDone(elem.offset, cpu_time);
             //tlviz.add_transmission(elem.target, elem.host, elem.starttime+o, elem.time-o, elem.size, G);
           } else {
             if(print) printf("-- [%i] start rendezvous message to: %i (offset: %i)\n", h, elem.host, elem.offset);
@@ -387,12 +422,18 @@ int main(int argc, char **argv) {
         // NUMBER of elements that were searched during message matching
         int32_t match_attempts;
 
+        if (elem.size == 0)
+          elem.size = 1;
+        
+        assert(elem.size > 0);
+
         // UPDATE the maximum UQ size
         if( args_info.qstat_given ){
           uq_max[elem.host] = std::max((int)uq[elem.host].size(), uq_max[elem.host]);
         }
         match_attempts = match(elem, &uq[elem.host], &matched_elem);
-        if(match_attempts >= 0)  { // found it in local UQ 
+        if(match_attempts >= 0)
+        { // found it in local UQ 
           // std::cout << "[INFO] Rank " << matched_elem.src << ": " <<
           //   matched_elem.offset << " -> " << "Rank " << elem.host << ": " << elem.offset << std::endl;
           if (args_info.comm_dep_file_given)
@@ -409,10 +450,22 @@ int main(int argc, char **argv) {
             uq_matches[elem.host].push_back(match);
             uq_times[elem.host].push_back(elem.time - matched_elem.starttime);
           }
+          
+          // If the message is found in the unexpected queue, the recv event should already have been executed
+          assert(elem.time >= matched_elem.starttime);
+          // The time after which the message is released from the NIC
+          uint64_t nic_time = std::max(nextgs[elem.host][elem.nic], elem.time) + g;
+          uint64_t cpu_time = nic_time + o + (elem.size-1) * O;
+
+          nexto[elem.host][elem.proc] = cpu_time;
+          
+            
+          nextgr[elem.host][elem.nic] = nic_time;
+
 
           if(elem.size > S) { // rendezvous - free remote request
             // satisfy remote requires 
-            parser.schedules[matched_elem.src].MarkNodeAsDone(matched_elem.offset); // this must be the offset of the remote packet!
+            parser.schedules[matched_elem.src].MarkNodeAsDone(matched_elem.offset, cpu_time); // this must be the offset of the remote packet!
             check_hosts.push_back(matched_elem.src);
 
             // TODO: uh, this is ugly ... we actually need to set the
@@ -425,8 +478,20 @@ int main(int argc, char **argv) {
             // anything!
             // TODO: do we need to add some latency for the ACK to
             // travel??? -- this can *not* be added here safely!
-            if(nexto[matched_elem.src][elem.proc] < elem.time) nexto[matched_elem.src][elem.proc] = elem.time;
-            if(nextgs[matched_elem.src][elem.nic] < elem.time) nextgs[matched_elem.src][elem.nic] = elem.time;
+            // if(nexto[matched_elem.src][elem.proc] < elem.time)
+            // {
+            //   nexto[matched_elem.src][elem.proc] = elem.time;
+            // }
+            // if(nextgs[matched_elem.src][elem.nic] < elem.time)
+            //   nextgs[matched_elem.src][elem.nic] = elem.time;
+            if (nexto[matched_elem.src][elem.proc] < cpu_time)
+            {
+              nexto[matched_elem.src][elem.proc] = cpu_time;
+            }
+            if (nextgs[matched_elem.src][elem.nic] < nic_time)
+            {
+              nextgs[matched_elem.src][elem.nic] = nic_time;
+            }
             
             if(print) printf("-- satisfy remote requires at host %i (offset: %i)\n", elem.target, elem.offset);
             tlviz.add_transmission(elem.host, matched_elem.src, matched_elem.starttime+o, elem.time, elem.size, G);
@@ -434,10 +499,12 @@ int main(int argc, char **argv) {
           tlviz.add_orecv(elem.host, elem.time, elem.time+o, elem.proc);
 
           // satisfy local requires
-          parser.schedules[elem.host].MarkNodeAsDone(elem.offset);
+          parser.schedules[elem.host].MarkNodeAsDone(elem.offset, cpu_time);
           check_hosts.push_back(elem.host);
           if(print) printf("-- satisfy local requires\n");
-        } else { // not found in local UQ - add to RQ
+        }
+        else
+        { // not found in local UQ - add to RQ
           if(args_info.qstat_given) {
             // RECORD match queue statistics
             std::pair<int,btime_t> match = std::make_pair((int)uq[elem.host].size(), elem.time);
@@ -449,6 +516,7 @@ int main(int argc, char **argv) {
           nelem.src = elem.target;
           nelem.tag = elem.tag;
           nelem.offset = elem.offset;
+          nelem.proc = elem.proc;
 #ifdef LIST_MATCH
           rq[elem.host].push_back(nelem);
           if (print)
@@ -461,82 +529,156 @@ int main(int argc, char **argv) {
 
       case OP_MSG: {
         if(print)
-          printf("[%i] found msg from %i, t: %lu (CPU: %i)\n", elem.host, elem.target, (ulint)elem.time, elem.proc);
+          printf("[%i] found msg from %i, t: %lu tag: %i, (CPU: %i)\n", elem.host, elem.target, (ulint)elem.time, elem.tag, elem.proc);
         uint64_t earliestfinish;
         // NUMBER of elements that were searched during message matching
         int32_t match_attempts;
-		    if((earliestfinish = net.query(elem.starttime, elem.time, elem.target, elem.host, elem.size, &elem.handle)) <= elem.time /* msg made it through network */ &&
-           std::max(nexto[elem.host][elem.proc],nextgr[elem.host][elem.nic]) <= elem.time /* local o,g available! */) { 
-          if(print) printf("-- msg o,g available (nexto: %lu, nextgr: %lu)\n", (long unsigned int) nexto[elem.host][elem.proc], (long unsigned int) nextgr[elem.host][elem.nic]);
-          
-          if (elem.size == 0)
-            elem.size = 1;
-          
-          assert(elem.size > 0);
-          // check if OS Noise occurred
-          btime_t noise = osnoise.get_noise(elem.host, elem.time, elem.time+o);
-          nexto[elem.host][elem.proc] = elem.time+o+noise+std::max((elem.size-1)*O, static_cast<uint64_t>((elem.size-1)*G)) /* message is only received after G is charged !! TODO: consuming o seems a bit odd in the LogGP model but well in practice */;
-          // std::cout << "[DEBUG] Actual time: " << nexto[elem.host][elem.proc] << std::endl;
-          nextgr[elem.host][elem.nic] = elem.time + g + static_cast<uint64_t>((elem.size-1)*G);
-          // UPDATE the maximum RQ size
-          if( args_info.qstat_given ){
-            rq_max[elem.host] = std::max((int)rq[elem.host].size(), rq_max[elem.host]);
-          }
- 
-          ruqelem_t matched_elem; 
+
+		    if((earliestfinish = net.query(elem.starttime, elem.time, elem.target, elem.host, elem.size, &elem.handle)) <= elem.time)
+        { /* msg made it through network */ // &&
+          //    std::max(nexto[elem.host][elem.proc],nextgr[elem.host][elem.nic]) <= elem.time /* local o,g available! */) { 
+          //   if(print)
+          //     printf("-- msg o,g available (nexto: %lu, nextgr: %lu)\n", (long unsigned int) nexto[elem.host][elem.proc], (long unsigned int) nextgr[elem.host][elem.nic]);          
+          ruqelem_t matched_elem;
           match_attempts = match(elem, &rq[elem.host], &matched_elem);
-          if(match_attempts >= 0) { // found it in RQ
-            // std::cout << "[INFO] Rank " << matched_elem.src << ": " <<
-            // matched_elem.offset << " -> " << "Rank " << elem.host << ": " << elem.offset << std::endl;
-            if (args_info.comm_dep_file_given)
+          if(match_attempts >= 0)
+          { // found it in RQ
+
+            if (elem.size == 0)
+              elem.size = 1;
+            
+            assert(elem.size > 0);
+
+            // The message needs to be executed on the CPU that was used to receive the message
+            uint8_t cpu = matched_elem.proc;
+            
+            if (std::max(nexto[elem.host][cpu], nextgr[elem.host][elem.nic]) <= elem.time)
             {
-              // Stores communication dependencies
-              auto dep = std::make_tuple(elem.target, elem.offset,
-                                         elem.host, matched_elem.offset);
-              comm_deps.push_back(dep);
+
+              // If local o,g available
+
+              // check if OS Noise occurred
+              btime_t noise = osnoise.get_noise(elem.host, elem.time, elem.time + o);
+
+              assert(elem.time >= nexto[elem.host][cpu]);
+
+              // The time after which the message is released from the NIC
+              // G * (size - 1) is already charged in the network layer
+              uint64_t nic_time = std::max(nextgr[elem.host][elem.nic], elem.time) + g;
+              uint64_t cpu_time = nic_time + o + noise + (elem.size-1) * O;
+              // nexto[elem.host][cpu] = elem.time+o+noise+std::max((elem.size-1)*O, static_cast<uint64_t>((elem.size-1)*G)) /* message is only received after G is charged !! TODO: consuming o seems a bit odd in the LogGP model but well in practice */;
+              nexto[elem.host][cpu] = cpu_time;
+
+              nextgr[elem.host][elem.nic] = nic_time;
+
+              if (print)
+              {
+                printf("-- executing on cpu %i, nexto[%i][%i] = %lu, nextgr[%i][%i] = %lu\n", cpu, elem.host, cpu, nexto[elem.host][cpu], elem.host, elem.nic, nextgr[elem.host][elem.nic]);
+              }
+
+
+              // UPDATE the maximum RQ size
+              if( args_info.qstat_given ){
+                rq_max[elem.host] = std::max((int)rq[elem.host].size(), rq_max[elem.host]);
+              }
+              // std::cout << "[INFO] Rank " << matched_elem.src << ": " <<
+              // matched_elem.offset << " -> " << "Rank " << elem.host << ": " << elem.offset << std::endl;
+              if (args_info.comm_dep_file_given)
+              {
+                // Stores communication dependencies
+                auto dep = std::make_tuple(elem.target, elem.offset,
+                                            elem.host, matched_elem.offset);
+                comm_deps.push_back(dep);
+              }
+
+              if(args_info.qstat_given) {
+                // RECORD match queue statistics
+                std::pair<int,btime_t> match = std::make_pair(match_attempts, elem.time);
+                rq_matches[elem.host].push_back(match);
+                /* Amount of time spent in queue */
+                rq_times[elem.host].push_back(elem.time - matched_elem.starttime);
+              }
+
+              if(print)
+                printf("-- found in RQ\n");
+              if(elem.size > S) { // rendezvous - free remote request
+                // satisfy remote requires
+                parser.schedules[elem.target].MarkNodeAsDone(elem.offset, cpu_time);
+                check_hosts.push_back(elem.target);
+                // TODO: uh, this is ugly ... we actually need to set the
+                // time of the remote freed elements to elem.time now :-/
+                // however, there is no simple way to do this :-(
+                // but since we just got the elem with elem.time from the
+                // queue, we can safely set the remote clocks to elem.time
+                // (there is no event < elem.time in the queue) this
+                // manipulation is dangerous, think before you change
+                // anything!
+                // TODO: do we need to add some latency for the ACK to
+                // travel??? -- this can *not* be added here safely!
+                // if(nexto[elem.target][elem.proc] < elem.time)
+                // {
+                //   nexto[elem.target][elem.proc] = elem.time;
+                // }
+                // if(nextgs[elem.target][elem.nic] < elem.time)
+                // {
+                //   nextgs[elem.target][elem.nic] = elem.time;
+                // }
+                if (nexto[elem.target][elem.proc] < cpu_time)
+                {
+                  nexto[elem.target][elem.proc] = cpu_time;
+                }
+                if (nextgs[elem.target][elem.nic] < nic_time)
+                {
+                  nextgs[elem.target][elem.nic] = nic_time;
+                }
+
+                if(print) printf("-- satisfy remote requires on host %i\n", elem.target);
+              }
+              tlviz.add_transmission(elem.target, elem.host, elem.starttime+o, elem.time, elem.size, G);
+              tlviz.add_orecv(elem.host, elem.time+ static_cast<uint64_t>((elem.size-1)*G)-(elem.size-1)*O,
+                              elem.time+o+std::max((elem.size-1)*O, static_cast<uint64_t>((elem.size-1)*G)), elem.proc);
+              tlviz.add_noise(elem.host,
+                              elem.time + o + std::max((elem.size-1) * O, static_cast<uint64_t>((elem.size - 1) * G)),
+                              elem.time + o + noise + std::max((elem.size-1)*O, static_cast<uint64_t>((elem.size - 1) * G)), elem.proc);
+              // satisfy local requires
+              parser.schedules[elem.host].MarkNodeAsDone(matched_elem.offset, cpu_time);
+              // struct DeserializedNode node = parser.schedules[elem.host].get_node_by_offset(matched_elem.offset);
+              // if (node.Proc != elem.proc)
+              // {
+              //   std::cout << "[DEBUG] HOST: " << elem.host << " matched elem proc: " << unsigned(node.Proc) << " elem proc: " << unsigned(elem.proc) << " offset: " << matched_elem.offset << " Time: " << elem.time / 1e9 << " Size: " << elem.size / 1e9 << " NextO: " << nexto[elem.host][elem.proc] / 1e9 << std::endl;
+              //   // exit(0);
+              // }
+
+              check_hosts.push_back(elem.host);
+              if (print)
+                printf("-- satisfy local requires\n");
+
+            }
+            else
+            {
+              uint64_t cpu_time = nexto[elem.host][cpu];
+              uint64_t nic_time = nextgr[elem.host][elem.nic];
+              // If local o,g unavailable - retry later
+              if(print)
+                printf("-- msg o,g not available, max(%lu, %lu) > %lu -- reinserting\n",
+                       (long unsigned int) nexto[elem.host][cpu],
+                       (long unsigned int) nextgr[elem.host][elem.nic],
+                       (long unsigned int) elem.time);
+              
+              elem.time = std::max(nexto[elem.host][cpu], nextgr[elem.host][elem.nic]);
+              aq.push(elem);
+
+              // Reinsert matched element into the RQ
+#ifdef LIST_MATCH
+              rq[elem.host].push_back(matched_elem);
+#else
+              rq[elem.host][std::make_pair(matched_elem.tag,matched_elem.src)].push(matched_elem);
+#endif
             }
 
-            if(args_info.qstat_given) {
-              // RECORD match queue statistics
-              std::pair<int,btime_t> match = std::make_pair(match_attempts, elem.time);
-              rq_matches[elem.host].push_back(match);
-              /* Amount of time spent in queue */
-              rq_times[elem.host].push_back(elem.time - matched_elem.starttime);
-            }
-
-            if(print)
-              printf("-- found in RQ\n");
-            if(elem.size > S) { // rendezvous - free remote request
-              // satisfy remote requires
-              parser.schedules[elem.target].MarkNodeAsDone(elem.offset);
-              check_hosts.push_back(elem.target);
-              // TODO: uh, this is ugly ... we actually need to set the
-              // time of the remote freed elements to elem.time now :-/
-              // however, there is no simple way to do this :-(
-              // but since we just got the elem with elem.time from the
-              // queue, we can safely set the remote clocks to elem.time
-              // (there is no event < elem.time in the queue) this
-              // manipulation is dangerous, think before you change
-              // anything!
-              // TODO: do we need to add some latency for the ACK to
-              // travel??? -- this can *not* be added here safely!
-              if(nexto[elem.target][elem.proc] < elem.time) nexto[elem.target][elem.proc] = elem.time;
-              if(nextgs[elem.target][elem.nic] < elem.time) nextgs[elem.target][elem.nic] = elem.time;
-
-              if(print) printf("-- satisfy remote requires on host %i\n", elem.target);
-            }
-            tlviz.add_transmission(elem.target, elem.host, elem.starttime+o, elem.time, elem.size, G);
-            tlviz.add_orecv(elem.host, elem.time+ static_cast<uint64_t>((elem.size-1)*G)-(elem.size-1)*O,
-                            elem.time+o+std::max((elem.size-1)*O, static_cast<uint64_t>((elem.size-1)*G)), elem.proc);
-            tlviz.add_noise(elem.host,
-                            elem.time + o + std::max((elem.size-1) * O, static_cast<uint64_t>((elem.size - 1) * G)),
-                            elem.time + o + noise + std::max((elem.size-1)*O, static_cast<uint64_t>((elem.size - 1) * G)), elem.proc);
-            // satisfy local requires
-            parser.schedules[elem.host].MarkNodeAsDone(matched_elem.offset);
-            check_hosts.push_back(elem.host);
-
-
-          } else { // not in RQ
+          }
+          else
+          { // not in RQ
             if(args_info.qstat_given) {
               // RECORD match queue statistics
               std::pair<int,btime_t> match = std::make_pair((int)rq[elem.host].size(), elem.time);
@@ -550,17 +692,30 @@ int main(int argc, char **argv) {
             nelem.tag = elem.tag;
             nelem.offset = elem.offset;
             nelem.starttime = elem.time; // when it was started
-#ifdef LIST_MATCH
+  #ifdef LIST_MATCH
             uq[elem.host].push_back(nelem);
-#else
+  #else
             uq[elem.host][std::make_pair(nelem.tag,nelem.src)].push(nelem);
-#endif
+  #endif
           }
         } else {
-          elem.time=std::max(std::max(nexto[elem.host][elem.proc],nextgr[elem.host][elem.nic]), earliestfinish);
-          if(print) printf("-- msg o,g not available -- reinserting\n");
+          // The message has not made it through the network yet -- reinsert it
+          if (print)
+            printf("-- msg has not made it through the network yet, %lu > %lu -- reinserting\n", earliestfinish, elem.time);
+          elem.time = earliestfinish;
           aq.push(elem);
         }
+        //   elem.time=std::max(std::max(nexto[elem.host][elem.proc],nextgr[elem.host][elem.nic]), earliestfinish);
+
+        //   // std::cout << "[DEBUG] REINSERTING NEXTO: " << nexto[elem.host][elem.proc] << " NEXTGR: " << nextgr[elem.host][elem.nic] << " EARLIESTFINISH: " << earliestfinish << std::endl;
+        //   // if (elem.time >= 1e9)
+        //   // {
+        //   //   std::cout << "[DEBUG] HOST: " << elem.host << " REINSERTING MSG " << elem.offset << " cpu: " << unsigned(elem.proc) << " src: " << elem.target << " Original time: " << original_time / 1e9 << " Time: " << elem.time / 1e9 << " Size: " << elem.size << " NEXTO: " << nexto[elem.host][elem.proc] / 1e9 << " NEXTGR: " << nextgr[elem.host][elem.nic] / 1e9 << " EARLIESTFINISH: " << earliestfinish / 1e9 << " AQ size: " << aq.size() << std::endl;
+        //   // }
+          
+        //   if(print) printf("-- msg o,g not available -- reinserting\n");
+        //   aq.push(elem);
+        // }
         
       } break;
         
@@ -568,7 +723,8 @@ int main(int argc, char **argv) {
         printf("not supported\n");
         break;
     }
-    
+
+
     // do only ask hosts that actually completed something in this round!
     new_events=false;
     std::sort(check_hosts.begin(), check_hosts.end());
@@ -602,17 +758,32 @@ int main(int argc, char **argv) {
         
         switch(freeop->type) {
           case OP_LOCOP:
-            freeop->time = nexto[host][freeop->proc];
+            // freeop->time = nexto[host][freeop->proc];
+            freeop->time = freeop->starttime;
+            // if (freeop->host == 2 && freeop->proc == 73)
+            // {
+            //   std::cout << "[DEBUG] FREEOP Locop offset " << freeop->offset << " NextO: " << nexto[freeop->host][freeop->proc] / 1e9 << " Time: " << freeop->time / 1e9 << std::endl;
+            // }
             if(print)
               printf("Freeop %i (%i,%i) loclop: %lu, time: %lu, offset: %i\n", host, freeop->proc, freeop->nic, (long unsigned int) freeop->size, (long unsigned int)freeop->time, freeop->offset);
             break;
           case OP_SEND:
-            freeop->time = std::max(nexto[host][freeop->proc], nextgs[host][freeop->nic]);
+            // freeop->time = std::max(nexto[host][freeop->proc], nextgs[host][freeop->nic]);
+            freeop->time = std::max(freeop->starttime, nextgs[host][freeop->nic]);
+            // if (freeop->proc == 73)
+            // {
+            //   std::cout << "[DEBUG] HOST " << host << " Send offset " << freeop->offset << " NextO: " << nexto[host][freeop->proc] / 1e9 << " Time: " << freeop->time / 1e9 << std::endl;
+            // }
             if(print)
               printf("Freeop %i (%i,%i) send to: %i, tag: %i, size: %lu, time: %lu, offset: %i\n", host, freeop->proc, freeop->nic, freeop->target, freeop->tag, (long unsigned int) freeop->size, (long unsigned int)freeop->time, freeop->offset);
             break;
           case OP_RECV:
-            freeop->time = nexto[host][freeop->proc];
+            // freeop->time = nexto[host][freeop->proc];
+            freeop->time = freeop->starttime;
+            // if (freeop->host == 2 && freeop->proc == 73)
+            // {
+            //   std::cout << "[DEBUG] FREEOP Recv offset " << freeop->offset << " NextO: " << nexto[freeop->host][freeop->proc] / 1e9 << " Time: " << freeop->time / 1e9 << std::endl;
+            // }
             if(print)
               printf("Freeop %i (%i,%i) recvs from: %i, tag: %i, size: %lu, time: %lu, offset: %i\n", host, freeop->proc, freeop->nic, freeop->target, freeop->tag, (long unsigned int) freeop->size, (long unsigned int)freeop->time, freeop->offset);
             break;
@@ -652,14 +823,14 @@ int main(int argc, char **argv) {
     if(!uq[i].empty()) {
       printf("unexpected queue on host %i contains %lu elements!\n", i, (ulint)uq[i].size());
       for(ruq_t::iterator iter=uq[i].begin(); iter != uq[i].end(); ++iter) {
-        printf(" src: %i, tag: %i\n", iter->src, iter->tag);
+        printf(" src: %i, tag: %u, size: %u\n", iter->src, iter->tag, iter->size);
       }
       ok=false;
     }
     if(!rq[i].empty()) {
       printf("receive queue on host %i contains %lu elements!\n", i, (ulint)rq[i].size());
       for(ruq_t::iterator iter=rq[i].begin(); iter != rq[i].end(); ++iter) {
-        printf(" src: %i, tag: %i, offset: %d\n", iter->src, iter->tag, iter->offset);
+        printf(" src: %i, tag: %u, offset: %u, size: %u\n", iter->src, iter->tag, iter->offset, iter->size);
       }
       ok=false;
     }
