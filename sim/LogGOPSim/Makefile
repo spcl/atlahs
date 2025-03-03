@@ -1,6 +1,6 @@
 CXX=g++
-CXXFLAGS= -O0 -g -pedantic -Wno-deprecated -Wall -Wno-long-long -I/usr/include/graphviz
-CCFLAGS= -O0 -g 
+CXXFLAGS= -O3 -g -pedantic -Wno-deprecated -Wall -Wno-long-long -I/usr/include/graphviz
+CCFLAGS= -O3 -g 
 LDFLAGS= -lcgraph -g
 
 AUTOGEN_SRC= cmdline.c cmdline.h 
