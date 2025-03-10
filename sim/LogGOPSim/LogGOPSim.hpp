@@ -49,9 +49,9 @@ class aqcompare_func {
   public:
   bool operator()(graph_node_properties x, graph_node_properties y) {
     if(x.time > y.time) return true;
-#ifdef STRICT_ORDER
-    if(x.time == y.time && x.ts > y.ts) return true; 
-#endif
+// #ifdef STRICT_ORDER
+//     if(x.time == y.time && x.ts > y.ts) return true; 
+// #endif
     return false;
   }
 };

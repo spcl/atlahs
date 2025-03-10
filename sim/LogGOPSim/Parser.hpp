@@ -680,7 +680,9 @@ class SerializedGraph {
 			uint32_t* dep_cnt = (uint32_t*) (mapping_start + sizeof(uint32_t)*2 + sizeof(uint32_t)*num_root_nodes + SIZEOF_NODE_INFO*offset);
 			(*dep_cnt)--;
 			if ((*dep_cnt) == 0) {
-				executableNodes.push_back(get_node_by_offset(offset));
+				DeserializedNode freed = get_node_by_offset(offset);
+				freed.start_time = 0;
+				executableNodes.push_back(freed);
 			}
 		}
 	}
@@ -692,9 +694,8 @@ class SerializedGraph {
 	 * @param cpu_time The timestamp of the CPU that executed the node specified
 	 * by the offset
 	 */
-	void MarkNodeAsDone(uint32_t offset, uint64_t cpu_time)
+	void MarkNodeAsDone(uint32_t offset, uint64_t cpu_time = 0)
 	{
-		
 		DeserializedNode N = get_node_by_offset(offset);
 		// std::cout << "[INFO] " << "Host: " << my_rank << ", Node " << offset << " has " << N.DependOnMe.size() << " dependencies" << std::endl;
 		for (uint32_t cnt=0; cnt<N.DependOnMe.size(); cnt++) {
@@ -711,9 +712,7 @@ class SerializedGraph {
 			else
 			{
 				node_start_time[offset] = std::max(node_start_time[offset], cpu_time);
-			}
-
-			// std::cout << "[INFO] " << "Host: " << my_rank << ", Node " << offset << " has " << *dep_cnt << " dependencies left" << std::endl;
+			}			
 			if ((*dep_cnt) == 0) 
 			{
 				DeserializedNode freed = get_node_by_offset(offset);

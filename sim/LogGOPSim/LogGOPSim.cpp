@@ -171,7 +171,7 @@ int main(int argc, char **argv) {
   // if (args_info.comm_dep_file_given)
   //   std::cout << "[DEBUG] Comm dep file: " << args_info.comm_dep_file_arg << std::endl;
   Parser parser(args_info.filename_arg, args_info.save_mem_given);
-  Network net(&args_info);
+  // Network net(&args_info);
 
   const uint p = parser.schedules.size();
   const int ncpus = parser.GetNumCPU();
@@ -256,7 +256,7 @@ int main(int argc, char **argv) {
     SerializedGraph::nodelist_t free_ops;
     sched->GetExecutableNodes(&free_ops);
     // ensure that the free ops are ordered by type
-    std::sort(free_ops.begin(), free_ops.end(), gnp_op_comp_func());
+    // std::sort(free_ops.begin(), free_ops.end(), gnp_op_comp_func());
 
     num_events += sched->GetNumNodes();
 
@@ -372,7 +372,7 @@ int main(int argc, char **argv) {
             tlviz.add_noise(elem.host, elem.time+o+ (elem.size-1)*O, elem.time + o + (elem.size-1)*O+ noise, elem.proc);
 
             // insert packet into network layer
-            net.insert(elem.time, elem.host, elem.target, elem.size, &elem.handle);
+            // net.insert(elem.time, elem.host, elem.target, elem.size, &elem.handle);
 
             elem.type = OP_MSG;
             int h = elem.host;
@@ -537,7 +537,7 @@ int main(int argc, char **argv) {
           // NUMBER of elements that were searched during message matching
           int32_t match_attempts;
 
-          if(true || (earliestfinish = net.query(elem.starttime, elem.time, elem.target, elem.host, elem.size, &elem.handle)) <= elem.time)
+          // if(true || (earliestfinish = net.query(elem.starttime, elem.time, elem.target, elem.host, elem.size, &elem.handle)) <= elem.time)
           { /* msg made it through network */ // &&
             //    std::max(nexto[elem.host][elem.proc],nextgr[elem.host][elem.nic]) <= elem.time /* local o,g available! */) { 
             //   if(print)
@@ -701,14 +701,16 @@ int main(int argc, char **argv) {
               uq[elem.host][std::make_pair(nelem.tag, nelem.src)].push(nelem);
     #endif
             }
-          } else {
-            // The message has not made it through the network yet -- reinsert it
-            if (print)
-              printf("-- msg has not made it through the network yet, %lu > %lu -- reinserting\n", earliestfinish, elem.time);
-            elem.time = earliestfinish;
-            aq.push(std::move(elem));
-            num_reinserts_net++;
           }
+          // else
+          // {
+          //   // The message has not made it through the network yet -- reinsert it
+          //   if (print)
+          //     printf("-- msg has not made it through the network yet, %lu > %lu -- reinserting\n", earliestfinish, elem.time);
+          //   elem.time = earliestfinish;
+          //   aq.push(std::move(elem));
+          //   num_reinserts_net++;
+          // }
           
         } break;
           
@@ -736,7 +738,7 @@ int main(int argc, char **argv) {
       SerializedGraph::nodelist_t free_ops;
       sched->GetExecutableNodes(&free_ops);
       // ensure that the free ops are ordered by type
-      std::sort(free_ops.begin(), free_ops.end(), gnp_op_comp_func());
+      // std::sort(free_ops.begin(), free_ops.end(), gnp_op_comp_func());
       
       // walk all new free operations and throw them in the queue 
       for(SerializedGraph::nodelist_t::iterator freeop=free_ops.begin(); freeop != free_ops.end(); ++freeop) {
@@ -754,11 +756,7 @@ int main(int argc, char **argv) {
         switch(freeop->type) {
           case OP_LOCOP:
             // freeop->time = nexto[host][freeop->proc];
-            freeop->time = freeop->starttime;
-            // if (freeop->host == 2 && freeop->proc == 73)
-            // {
-            //   std::cout << "[DEBUG] FREEOP Locop offset " << freeop->offset << " NextO: " << nexto[freeop->host][freeop->proc] / 1e9 << " Time: " << freeop->time / 1e9 << std::endl;
-            // }
+            freeop->time = std::max(freeop->starttime, nexto[host][freeop->proc]);
             if(print)
               printf("Freeop %i (%i,%i) loclop: %lu, time: %lu, offset: %i\n", host, freeop->proc, freeop->nic, (long unsigned int) freeop->size, (long unsigned int)freeop->time, freeop->offset);
             break;
@@ -775,10 +773,6 @@ int main(int argc, char **argv) {
           case OP_RECV:
             // freeop->time = nexto[host][freeop->proc];
             freeop->time = freeop->starttime;
-            // if (freeop->host == 2 && freeop->proc == 73)
-            // {
-            //   std::cout << "[DEBUG] FREEOP Recv offset " << freeop->offset << " NextO: " << nexto[freeop->host][freeop->proc] / 1e9 << " Time: " << freeop->time / 1e9 << std::endl;
-            // }
             if(print)
               printf("Freeop %i (%i,%i) recvs from: %i, tag: %i, size: %lu, time: %lu, offset: %i\n", host, freeop->proc, freeop->nic, freeop->target, freeop->tag, (long unsigned int) freeop->size, (long unsigned int)freeop->time, freeop->offset);
             break;
