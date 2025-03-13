@@ -3,9 +3,10 @@ import argparse
 import json
 import random
 import re
+from tqdm import tqdm
 
 
-from typing import List, Dict, Optional, Tuple, Union
+from typing import List, Dict, Optional, Tuple, Union, TextIO
 
 # ===============================================
 # Utility functions
@@ -188,6 +189,62 @@ def verify_custom_pattern(mode: str, job_ranks: List[int], pattern: List[List[in
         exit(1)
 
 
+def rank_mapping_to_job_ranks(rank_mapping: List[List[int]]) -> Dict[int, Tuple[int, int]]:
+    """
+    Converts the given rank mapping to a dictionary of tuples where the tuple
+    at key i contains the job index and the rank index in the job.
+    Only works for multi-job mode.
+    """
+    res = {}
+    for job, mapped_ranks in enumerate(rank_mapping):
+        for i, rank in enumerate(mapped_ranks):
+            res[rank] = (job, i)
+    return res
+
+
+def rank_remap_for_job(rank_mapping: List[List[int]]) -> List[List[int]]:
+    """
+    Remaps the ranks in all jobs in order to determine the sending and
+    receiving ranks in the new GOAL file. Returns a list of lists where
+    each list contains the new ranks for a job. Index i in the list
+    corresponds to the rank in the old GOAL file, and the value at
+    index i is the new rank in the new GOAL file.
+    """
+    res = []
+    for ranks in rank_mapping:
+        job_rank_remap = []
+        for rank in ranks:
+            job_rank_remap.append(rank)
+        res.append(job_rank_remap)
+    return res
+
+
+def get_rank_pos_in_goal_files(goal_files: List[str], rank_mapping: List[List[int]]) \
+    -> List[List[int]]:
+    """
+    Get the position of the start of each rank in the each of
+    the goal files. Returns a list of lists where the index i of each
+    list corresponds to the position of the rank i in the GOAL file.
+    This is done so that we can easily extract the rank schedules
+    from the GOAL files without having to traverse them multiple times.
+    """
+    res = []
+    for i, goal_file in enumerate(goal_files):
+        f = open(goal_file, "r")
+        rank_pos = []
+        while True:
+            line = f.readline()
+            if not line:
+                break
+            if line.startswith("rank"):
+                rank_pos.append(f.tell())
+        assert len(rank_pos) == len(rank_mapping[i]), \
+            f"Number of ranks does not match in '{goal_file}'."
+        f.close()
+        res.append(rank_pos)
+    return res
+
+
 # ===============================================
 # Main functions
 # ===============================================
@@ -253,7 +310,85 @@ def get_rank_mapping(mode: str, job_ranks: List[int], pattern: Union[List, str],
     else:
         print_error(f"Invalid pattern: {pattern}")
         exit(1)
-    
+
+
+
+def write_rank_sched_to_output(out: TextIO, rank: int, rank_remap: List[List[int]],
+                               rank_pos: List[int], goal_file_path: str) -> None:
+    """
+    Writes the rank schedule to the output file.
+    """
+    goal_file = open(goal_file_path, "r")
+    goal_file.seek(rank_pos[rank])
+    while True:
+        line = goal_file.readline()
+        if not line or line.startswith("}"):
+            break
+        tokens = line.split()
+        if len(tokens) == 0:
+            continue
+        
+        if tokens[1] == "send":
+            assert len(tokens) >= 7, f"Invalid send operation: {line}"
+            # Try to replace the destination rank in a operation
+            # with the following format as per the remapping
+            # l<op_id>: send <size>b to <dst> tag <tag> cpu <cpu> nic <nic>
+            remapped_dst = rank_remap[int(tokens[4])]
+            prefix = " ".join(tokens[:4])
+            suffix = " ".join(tokens[5:])
+            out.write(f"{prefix} {remapped_dst} {suffix}\n")
+        elif tokens[1] == "recv":
+            assert len(tokens) >= 7, f"Invalid recv operation: {line}"
+            # Try to replace the source rank in a operation
+            # with the following format as per the remapping
+            # l<op_id>: recv <size>b from <src> tag <tag> cpu <cpu> nic <nic>
+            remapped_src = rank_remap[int(tokens[4])]
+            prefix = " ".join(tokens[:4])
+            suffix = " ".join(tokens[5:])
+            out.write(f"{prefix} {remapped_src} {suffix}\n")
+        else:
+            out.write(line)
+
+
+def generate_multi_job_goal(goal_files: List[str], rank_mapping: List[List[int]],
+                            output_file: str, verbose: bool) -> None:
+    """
+    Generates a multi-job goal file based on the given rank mapping as well
+    as the list of goal files.
+    """
+    print_info(f"Generating multi-job goal file: {output_file}...", verbose)
+
+    job_ranks = rank_mapping_to_job_ranks(rank_mapping)
+
+    rank_remap = rank_remap_for_job(rank_mapping)
+    print("job_ranks", job_ranks)
+    rank_pos = get_rank_pos_in_goal_files(goal_files, rank_mapping)
+    print_info(f"Obtained the positions of ranks in the GOAL files.", verbose)
+
+    total_ranks = sum([len(x) for x in rank_mapping])
+
+    out = open(output_file, "w")
+    # Write preamble
+    out.write(f"num_ranks {total_ranks}\n\n")
+
+    for i in tqdm(range(total_ranks), disable=not verbose):
+        job, rank = job_ranks[i]
+        out.write(f"rank {i} {{\n")
+        write_rank_sched_to_output(out, rank, rank_remap[job], rank_pos[job], goal_files[job])
+        out.write("}\n\n")
+
+    out.close()
+    print_success(f"Successfully generated multi-job goal file: {output_file}")
+
+
+def generate_multi_tenant_goal(goal_files: List[str], rank_mapping: List[List[int]],
+                               output_file: str, verbose: bool) -> None:
+    """
+    Generates a multi-tenant goal file based on the given rank mapping as well
+    as the list of goal files.
+    """
+    raise NotImplementedError("Multi-tenant goal generation is not implemented yet.")
+
 
 
 if __name__ == "__main__":
@@ -280,3 +415,11 @@ if __name__ == "__main__":
     rank_mapping = get_rank_mapping(config["mode"], job_ranks, config["pattern"], verbose)
 
     print_success(f"Successfully generated rank mapping: {rank_mapping}", verbose)
+
+    if config["mode"] == "multi-job":
+        generate_multi_job_goal(config["goal_files"], rank_mapping, args.output, verbose)
+    elif config["mode"] == "multi-tenant":
+        generate_multi_tenant_goal(config["goal_files"], rank_mapping, args.output, verbose)
+    else:
+        print_error(f"Invalid mode: {config['mode']}")
+        exit(1)

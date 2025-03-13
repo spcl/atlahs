@@ -133,9 +133,6 @@ static inline int match(const graph_node_properties &elem, ruq_t *q, ruqelem_t *
   }
   if(retelem) *retelem=tq->front();
   tq->pop();
-  if(tq->empty()) {
-    q->erase(iter);
-  }
   return 0;
 }
 #endif
@@ -549,6 +546,7 @@ int main(int argc, char **argv) {
             match_attempts = match(elem, &rq[elem.host], &matched_elem);
             if(match_attempts >= 0)
             { // found it in RQ
+
               if (elem.size == 0)
                 elem.size = 1;
               
@@ -657,6 +655,8 @@ int main(int argc, char **argv) {
               }
               else
               {
+                // uint64_t cpu_time = nexto[elem.host][cpu];
+                // uint64_t nic_time = nextgr[elem.host][elem.nic];
                 // If local o,g unavailable - retry later
                 if(print)
                   printf("-- msg o,g not available, max(%lu, %lu) > %lu -- reinserting\n",

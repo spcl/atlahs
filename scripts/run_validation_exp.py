@@ -6,7 +6,6 @@ Results will be stored in the results directory as CSV files and plots.
 
 import os
 import argparse
-import shutil
 import pandas as pd
 from tqdm import tqdm
 import yaml
@@ -64,7 +63,7 @@ def check_dir_exists(directory: str, overwrite: bool, verbose: bool) -> None:
     if os.path.exists(directory):
         if overwrite:
             print_warning(f"Directory {directory} already exists. Overwriting.", verbose)
-            shutil.rmtree(directory)
+            os.removedirs(directory)
             os.makedirs(directory, exist_ok=True)
         else:
             print_info(f"Directory {directory} already exists. Continuing without overwriting.", verbose)
@@ -96,7 +95,6 @@ def get_real_runtime_for_hpc_traces(trace_dir: str, verbose: bool) -> int:
     in each of the trace files in the given directory.
     @return: The real runtime of the application in ns.
     """
-    max_runtime = 0
     for trace_file in os.listdir(trace_dir):
         trace_path = os.path.join(trace_dir, trace_file)
         f = open(trace_path, 'r')
@@ -105,15 +103,16 @@ def get_real_runtime_for_hpc_traces(trace_dir: str, verbose: bool) -> int:
         # Get the start time
         start_time = None
         end_time = None
+
         for line in lines:
-            tokens = line.split(":")
-            if tokens[0] == "MPI_Init" or tokens[0] == "MPI_Init_thread":
+            if line.startswith("MPI_Init_thread") or line.startswith("MPI_Init"):
+                tokens = line.split(":")
                 start_time = int(tokens[-1])
                 break
         
         for line in reversed(lines):
-            tokens = line.split(":")
-            if tokens[0] == "MPI_Finalize":
+            if line.startswith("MPI_Finalize"):
+                tokens = line.split(":")
                 end_time = int(tokens[1])
                 break
         
@@ -121,10 +120,8 @@ def get_real_runtime_for_hpc_traces(trace_dir: str, verbose: bool) -> int:
         assert end_time is not None, f"End time not found in {trace_file}."
 
         f.close()
-        max_runtime = max(max_runtime, (end_time - start_time) * 1e3) # ns
-    
-    return max_runtime
-         
+
+        return (end_time - start_time) * 1e3
             
 
 def get_pred_runtime_for_lgs_simulator(output: str, verbose: bool) -> int:
@@ -165,7 +162,7 @@ def run_lgs_simulator(bin_file: str, sim_config: str, exec: str, verbose: bool) 
     S = config.get("S", 0)
 
     print(f"Running LGS simulator with parameters: L={L}, o={o}, g={g}, G={G}, O={O}, S={S}")
-    cmd = f"{exec} -L {L} -o {o} -g {g} -G {G} -O {O} -S {S} -f {bin_file}"
+    cmd = f"{exec} -b {bin_file} -L {L} -o {o} -g {g} -G {G} -O {O} -S {S} -f {bin_file}"
     print_info(f"Running command: {cmd}", verbose)
     process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = process.communicate()
@@ -205,6 +202,7 @@ def run_validation_exp_for_setup(setup_dir: str, result_dir: str, simulator: str
             bin_file = os.path.join(setup_dir, f)
         if os.path.isdir(os.path.join(setup_dir, f)):
             trace_dir = os.path.join(setup_dir, f)
+            break
     
     assert trace_dir is not None, f"No trace directory found in {setup_dir}."
     assert bin_file is not None, f"No bin file found in {setup_dir}."
@@ -261,18 +259,8 @@ def run_validation_exp(trace_dir: str, result_dir: str, simulator: str,
     
     print_info(f"Found {len(app_dirs)} subdirectories in the trace directory.", verbose)
 
-    result_file_path = os.path.join(result_dir, f"{simulator}_{app_type}_results.csv")
-    # Checks if the file is empty and writes the header
-    data_pdf = None
-    if not os.path.exists(result_file_path) or os.stat(result_file_path).st_size == 0:
-        with open(result_file_path, 'w') as f:
-            f.write("app,setup,real_runtime,predicted_runtime\n")
-    else:
-        print_warning(f"Result file {result_file_path} already exists. Appending to the file.", verbose)
-        data_pdf = pd.read_csv(result_file_path)
-    
-    result_file = open(result_file_path, 'a')
     # Iterate over the subdirectories and run the validation experiment
+    results = ["app_name,setup_name,real_runtime,pred_runtime"]
     for app_dir in app_dirs:
         app_name = os.path.basename(app_dir)
         print_info(f"Running validation experiment for {app_name}.", verbose)
@@ -285,28 +273,23 @@ def run_validation_exp(trace_dir: str, result_dir: str, simulator: str,
         # Iterate over the setup directories and run the validation experiment
         for setup_dir in setup_dirs:
             setup_name = os.path.basename(setup_dir)
-            # Checks if the setup has already been run
-            if data_pdf is not None and data_pdf[(data_pdf['app'] == app_name) & (data_pdf['setup'] == setup_name)].shape[0] > 0:
-                print_warning(f"Setup {setup_name} for app {app_name} already exists in the result file. Skipping.", verbose)
-                continue
 
             # Run the validation experiment for the given setup
             real_t, pred_t = run_validation_exp_for_setup(setup_dir, result_dir, simulator,
                                                           sim_config, exec, app_type, overwrite, verbose)
             print_info(f"{setup_name}, Real runtime: {real_t}, Predicted runtime: {pred_t}", verbose)
-            
-            result_file.write(f"{app_name},{setup_name},{real_t},{pred_t}\n")
-            result_file.flush()
+            results.append(f"{app_name},{setup_name},{real_t},{pred_t}")
     
-    
+    # Write the results to a CSV file
+    result_file = os.path.join(result_dir, f"{simulator}_validation_results.csv")
+    write_results_to_csv(results, result_file, verbose)
+
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run the validation experiment for the paper.')
-    parser.add_argument('-i', '--trace-dir', type=str, required=True,
-                        help='Directory containing the traces.')
-    parser.add_argument('-o', '--result-dir', type=str, required=True,
-                        help='Directory to store the results.')
+    parser.add_argument('-i', '--trace-dir', type=str, help='Directory containing the traces.')
+    parser.add_argument('-o', '--result-dir', type=str, help='Directory to store the results.')
     parser.add_argument('-v', '--verbose', action='store_true', help='Print verbose output.')
     parser.add_argument('--overwrite', action='store_true', help='Overwrite existing results.')
     parser.add_argument('-c', '--config', type=str, default="configs/lgs_config.yaml",
