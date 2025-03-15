@@ -5,31 +5,20 @@ import sqlite3
 from typing import Dict, Optional, List
 
 
-def get_ranks(result_dir: str) -> Dict[str, int]:
-    """
-    Retrieves the ranks of each compute node from the JSON file
-    `nsys_events_intermediate_output.json` in the result directory.
-    """
-    assert os.path.exists(result_dir), f"Directory {result_dir} does not exist"
-    intermediate_output = os.path.join(result_dir, "nsys_events_intermediate_output.json")
-    assert os.path.exists(intermediate_output), f"File {intermediate_output} does not exist"
-
-    with open(intermediate_output) as f:
-        data = json.load(f)
-
-    assert "hostname_to_rank" in data, "[ERROR] Wrong format: Key 'hostname_to_rank' not found in JSON file"
-    return data["hostname_to_rank"]
-
-
-def nsys_profiling_marks_present(result_dir: str, host_to_rank: Dict[str, int]) -> Optional[float]:
+def nsys_profiling_marks_present(trace_dir: str) -> Optional[float]:
     """
     Checks if the nsys profiling marks are present in the intermediate output file.
     If they are present, returns the actual runtime of the application.
     None otherwise.
     """
+    # Retreives all the sqlite files from the given `trace_dir`
+    
+    db_files = [os.path.join(trace_dir, f) for f in os.listdir(trace_dir) if f.endswith(".sqlite")]
+
+    assert len(db_files) > 0, f"No SQLite database files found in {trace_dir}"
+
     res = None
-    for hostname, rank in host_to_rank.items():
-        db_file = os.path.join(result_dir, "nsys_reports", f"nsys_report_{hostname}.sqlite")
+    for db_file in db_files:
         assert os.path.exists(db_file), f"File {db_file} does not exist"
 
         # Connects to the SQLite database file
@@ -60,12 +49,13 @@ def nsys_profiling_marks_present(result_dir: str, host_to_rank: Dict[str, int]) 
     return res
 
 
-def get_actual_runtime(result_dir: str, host_to_rank: Dict[str, int]) -> None:
+def get_actual_runtime(trace_dir: str) -> None:
     """
     Retrieves the actual runtime of each rank from the SQLite database files
     """
-    for hostname, rank in host_to_rank.items():
-        db_file = os.path.join(result_dir, "nsys_reports", f"nsys_report_{hostname}.sqlite")
+    db_files = [os.path.join(trace_dir, f) for f in os.listdir(trace_dir) if f.endswith(".sqlite")]
+    max_runtime = 0
+    for db_file in db_files:
         assert os.path.exists(db_file), f"File {db_file} does not exist"
 
         # Connects to the SQLite database file
@@ -86,27 +76,24 @@ def get_actual_runtime(result_dir: str, host_to_rank: Dict[str, int]) -> None:
         
         actual_runtime = end_time - start_time
 
-        print(f"Rank {rank} on {hostname} took {actual_runtime} ns ({actual_runtime / 1e9} s)")
-
-    return actual_runtime
+        max_runtime = max(max_runtime, actual_runtime)
+    print(f"Measured runtime: {max_runtime} ns ({max_runtime / 1e9} s)")
+    return max_runtime
 
 if __name__ == "__main__":
     # Parses the first argument as the directory which contains the SQLite database files
     # as well as the intermediate output files
     if len(sys.argv) == 1:
-        result_dir = "results"
-        print(f"Using default result directory: {result_dir}")
+        trace_dir = "results/nsys_reports"
+        print(f"Using default result directory: {trace_dir}")
     else:
-        result_dir = sys.argv[1]
-        print(f"Using result directory: {result_dir}")
-
-    # Retrieves the ranks of each compute node from the JSON file
-    ranks = get_ranks(result_dir)
+        trace_dir = sys.argv[1]
+        print(f"Using result directory: {trace_dir}")
 
     # Retrieves the actual runtime of each rank from the SQLite database files
-    profiling_mark_runtime = nsys_profiling_marks_present(result_dir, ranks)
+    profiling_mark_runtime = nsys_profiling_marks_present(trace_dir)
     if profiling_mark_runtime is None:
-        get_actual_runtime(result_dir, ranks)
+        get_actual_runtime(trace_dir)
     else:
         print(f"Found nsys profiling markers in the intermediate output file")
         print(f"Measured runtime: {profiling_mark_runtime} ns ({profiling_mark_runtime / 1e9} s)")
