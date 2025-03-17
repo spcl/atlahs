@@ -7,6 +7,7 @@ import time
 
 CONVERION_SCRIPT = "nsys_reports_to_sqlite.sh"
 GET_RUNTIME_SCRIPT = "get_measured_runtime_ai.py"
+DATA_DIR = "/capstor/scratch/cscs/sshen/workspace/atlahs/data"
 SLURM_JOB_CHECK_INTERVAL = 30
 
 # =================================================
@@ -82,7 +83,7 @@ def slurm_job_finished(job_id: str, check_interval: int = 10) -> bool:
         print_error("Failed to fetch the job state")
         exit(1)
     
-    return states[0] == "COMPLETED" or states[0] == "CANCELLED" or states[0] == "FAILED"
+    return states[0] == "COMPLETED" or states[0] == "CANCELLED" or states[0] == "FAILED" or states[0] == "TIMEOUT"
 
 # =================================================
 # Main function
@@ -104,19 +105,20 @@ def run_ai_app(output_file: str, num_trials: int, command: str, trace_dir: str,
     is_slurm = cmd[0] == "sbatch"
     print_info(f"SLURM job detected", verbose)
 
+
+    # Clean the trace directory from the previous runs
+    if os.path.exists(trace_dir):
+        print_info("Cleaning the trace directory...", verbose)
+        clean_cmd = ["rm", "-rf", trace_dir]
+        result = subprocess.run(clean_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            print_error(f"Failed to run the command: {result.stderr.decode()}", verbose)
+            exit(1)
+    os.makedirs(trace_dir, exist_ok=True)
+    print_info("Trace directory cleaned", verbose)
+
     for i in range(num_trials):
         print_info(f"Running trial {i+1}/{num_trials}...")
-
-        # Clean the trace directory
-        if os.path.exists(trace_dir):
-            print_info("Cleaning the trace directory...", verbose)
-            clean_cmd = ["rm", "-rf", trace_dir]
-            result = subprocess.run(clean_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            if result.returncode != 0:
-                print_error(f"Failed to run the command: {result.stderr.decode()}", verbose)
-                exit(1)
-        os.makedirs(trace_dir, exist_ok=True)
-        print_info("Trace directory cleaned", verbose)
         
         result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode != 0:
@@ -181,6 +183,26 @@ def run_ai_app(output_file: str, num_trials: int, command: str, trace_dir: str,
         else:
             print_error(f"Failed to parse the output: {output}", verbose)
             exit(1)
+        
+        # Moves the trace files to a separate directory
+        dest_dir = os.path.join(DATA_DIR, "tmp_traces", f"trial_{i+1}")
+        os.makedirs(dest_dir, exist_ok=True)
+        move_cmd = ["mv", os.path.join(trace_dir, "*"), dest_dir]
+        result = subprocess.run(move_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            print_error(f"Failed to run the command: {result.stderr.decode()}", verbose)
+            exit(1)
+        print_success(f"Moved the trace files to {dest_dir}", verbose)
+
+        # Cleans the trace directory
+        print_info("Cleaning the trace directory...", verbose)
+        clean_cmd = ["rm", "-rf", trace_dir]
+        result = subprocess.run(clean_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            print_error(f"Failed to run the command: {result.stderr.decode()}", verbose)
+            exit(1)
+        os.makedirs(trace_dir, exist_ok=True)
+        print_info("Trace directory cleaned", verbose)
 
     output.close()
 
