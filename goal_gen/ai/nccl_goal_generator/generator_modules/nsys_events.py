@@ -5,6 +5,7 @@ import json
 import math
 import sqlite3
 import re
+from tqdm import tqdm
 
 from typing import Dict, List, Tuple, Optional
 from collections import defaultdict
@@ -91,7 +92,7 @@ def get_nsys_events(dir_path):
 
             pattern_ncclKernel = r'ncclLaunchKernel\(\): pid (\d+)'
 
-            for row in nvtx_events_results:
+            for row in tqdm(nvtx_events_results):
                 if row[0]:
                     match_profile_start = re.search(pattern_nsys_profile_start, row[0])
                     match_profile_end = re.search(pattern_nsys_profile_end, row[0])
@@ -533,21 +534,22 @@ def get_nsys_events(dir_path):
                                 if streamId not in nccl_events[goal_rank][gpuId]:
                                     nccl_events[goal_rank][gpuId][streamId] = []
 
-                                nccl_events[goal_rank][gpuId][streamId].append(
-                                    {
-                                        'event_type': 'AllGather',
-                                        'commId': commId,
-                                        'comm_index': comm_info[commId]['comm_index'],
-                                        'streamId': streamId,
-                                        'my_rank': my_rank,
-                                        'gpuId': gpuId,
-                                        'data_size': data_size,
-                                        'type_size': type_size,
-                                        'ts_start': ts_start,
-                                        'ts_end': ts_end,
-                                        'seq': events_counter[goal_rank][gpuId][commId]['AllGather']
-                                    }
-                                )    
+                                if data_size > 0:
+                                    nccl_events[goal_rank][gpuId][streamId].append(
+                                        {
+                                            'event_type': 'AllGather',
+                                            'commId': commId,
+                                            'comm_index': comm_info[commId]['comm_index'],
+                                            'streamId': streamId,
+                                            'my_rank': my_rank,
+                                            'gpuId': gpuId,
+                                            'data_size': data_size,
+                                            'type_size': type_size,
+                                            'ts_start': ts_start,
+                                            'ts_end': ts_end,
+                                            'seq': events_counter[goal_rank][gpuId][commId]['AllGather']
+                                        }
+                                    )
                                 
                                 events_counter[goal_rank][gpuId][commId]['AllGather'] += 1
 
@@ -626,23 +628,23 @@ def get_nsys_events(dir_path):
                                 streamId = stream_to_streamId[gpuId][stream]
                                 if streamId not in nccl_events[goal_rank][gpuId]:
                                     nccl_events[goal_rank][gpuId][streamId] = []
-
-                                nccl_events[goal_rank][gpuId][streamId].append(
-                                    {
-                                        'event_type': 'ReduceScatter',
-                                        'commId': commId,
-                                        'comm_index': comm_info[commId]['comm_index'],
-                                        'streamId': streamId,
-                                        'my_rank': my_rank,
-                                        'gpuId': gpuId,
-                                        'data_size': data_size,
-                                        'type_size': type_size,
-                                        'red_op': red_op,
-                                        'ts_start': ts_start,
-                                        'ts_end': ts_end,
-                                        'seq': events_counter[goal_rank][gpuId][commId]['ReduceScatter']
-                                    }
-                                )    
+                                if data_size > 0:
+                                    nccl_events[goal_rank][gpuId][streamId].append(
+                                        {
+                                            'event_type': 'ReduceScatter',
+                                            'commId': commId,
+                                            'comm_index': comm_info[commId]['comm_index'],
+                                            'streamId': streamId,
+                                            'my_rank': my_rank,
+                                            'gpuId': gpuId,
+                                            'data_size': data_size,
+                                            'type_size': type_size,
+                                            'red_op': red_op,
+                                            'ts_start': ts_start,
+                                            'ts_end': ts_end,
+                                            'seq': events_counter[goal_rank][gpuId][commId]['ReduceScatter']
+                                        }
+                                    )
                                 
                                 events_counter[goal_rank][gpuId][commId]['ReduceScatter'] += 1
 
