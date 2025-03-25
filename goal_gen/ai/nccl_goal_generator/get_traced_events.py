@@ -56,6 +56,7 @@ def main():
     parser.add_argument('--merge-non-overlap', action='store_true', help='Whether to merge non-overlapping events for all streams if possible')
     parser.add_argument("--unique-nic", action='store_true', help="Whether to assign a separate NIC ID for each GPU in GOAL")
     args = parser.parse_args()
+
     if args.no_intermediate_output:
         print("[INFO] No intermediate output will be generated")
     init_data(args.npkit_file_Simple, args.npkit_file_LL)
@@ -136,11 +137,12 @@ def main():
     Goal_File_Name = os.path.join(output_dir, 'InGPU_MicroEvents_Dependency.goal')
     SendRecvEvents_To_TaskCounter = get_in_gpu_microevents_dependency(Events_Parallel_Group, Comm_Init_Events, Comm_Info, Goal_File_Name, profile_interval, True)
 
-    out_json_path = os.path.join(output_dir, 'SendRecvEvents_To_TaskCounter.json')
-    with open(out_json_path, 'w') as json_file:
-        json.dump(SendRecvEvents_To_TaskCounter, json_file, indent=4)
-        json_file.write("\n\n")
-    print('In-GPU goal file has been exported to InGPU_MicroEvents_Dependency.goal')
+    if not args.no_intermediate_output:
+        out_json_path = os.path.join(output_dir, 'SendRecvEvents_To_TaskCounter.json')
+        with open(out_json_path, 'w') as json_file:
+            json.dump(SendRecvEvents_To_TaskCounter, json_file, indent=4)
+            json_file.write("\n\n")
+        print('In-GPU goal file has been exported to InGPU_MicroEvents_Dependency.goal')
 
     # Goal_File_Name = './results/InterNode_MicroEvents_Dependency.goal'
     Goal_File_Name = os.path.join(output_dir, 'InterNode_MicroEvents_Dependency.goal')
