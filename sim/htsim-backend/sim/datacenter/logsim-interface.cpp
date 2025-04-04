@@ -2,7 +2,7 @@
 
 #include "logsim-interface.h"
 #include "lgs/LogGOPSim.hpp"
-#include "lgs/Network.hpp"
+//#include "lgs/Network.hpp"
 #include "lgs/Noise.hpp"
 #include "lgs/Parser.hpp"
 #include "lgs/TimelineVisualization.hpp"
