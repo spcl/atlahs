@@ -485,12 +485,12 @@ int start_lgs(std::string filename_goal, LogSimInterface &lgs) {
     uint lastperc=0;
     int send_doing = 0;
 
-    while(!lgs_interface->aq.empty() || new_events || lgs_interface->sends_active > 0 ||  lgs_interface->compute_started > 0  /* || (size_queue(rq, p) > 0) || (size_queue(uq, p) > 0) */) {
+    while(!lgs_interface->aq.empty() || new_events || lgs_interface->sends_active > 0 ||  lgs_interface->compute_started > 0) {
 
       count_cycless++;
       if (count_cycless > 20000000) {
-          printf("Count1 Cycles Exceeded 200000\n");
-          exit(0);
+          //printf("Count1 Cycles Exceeded 200000\n");
+          //exit(0);
       }
       int count_cycles = 0;
       int64_t can_simulate_until = -1;
@@ -520,10 +520,11 @@ int start_lgs(std::string filename_goal, LogSimInterface &lgs) {
 
             count_cycles++;
             if (count_cycles > 200000000) {
-                printf("Count Cycles Exceeded 200000\n");
-                exit(0);
+                //printf("Count Cycles Exceeded 200000\n");
+                //exit(0);
             }
             graph_node_properties elem = lgs_interface->aq.top();
+
             if (elem.offset % 100 == 0) {
                 //printf("Considering Element Host %d Offset %d\n", elem.host, elem.offset);
             }
@@ -533,6 +534,12 @@ int start_lgs(std::string filename_goal, LogSimInterface &lgs) {
             //elem.nic = 0;
             if (elem.time < lgs_interface->htsim_api->getGlobalTimeNs()) {
               elem.time = lgs_interface->htsim_api->getGlobalTimeNs();
+            }
+
+            if (elem.host == elem.target && (elem.type == OP_SEND || elem.type == OP_RECV)) {
+              elem.type = OP_LOCOP;
+              elem.size = 1;
+              lgs_interface->aq.push(elem);
             }
 
             // the BIG switch on element type that we just found 
@@ -577,7 +584,7 @@ int start_lgs(std::string filename_goal, LogSimInterface &lgs) {
     
             case OP_LOCOP_IN_PROGRESS: {
               uint64_t cpu_time = elem.time;
-              nexto[elem.host][elem.proc] = cpu_time;  
+              //nexto[elem.host][elem.proc] = cpu_time;  
               parser.schedules[elem.host].MarkNodeAsDone(elem.offset, cpu_time);
               check_hosts.insert(elem.host);
             } break;
@@ -595,7 +602,7 @@ int start_lgs(std::string filename_goal, LogSimInterface &lgs) {
                   check_hosts.insert(elem.host);
                   check_hosts.insert(elem.target);
 
-                  // FIXME: this is a hack to make sure that the size is at least 1
+                  // This is a hack to make sure that the size is at least 1
                   if (elem.size == 0)
                       elem.size = 1;
                   assert(elem.size > 0);
@@ -629,7 +636,7 @@ int start_lgs(std::string filename_goal, LogSimInterface &lgs) {
               } else { // local o,g unavailable - retry later
               if(print) printf("-- send local o,g not available -- reinserting\n");
                   //printf("Reinseringg send %d %d %d %d at %lu\n", elem.host, elem.target, elem.tag, elem.size, resource_time);
-                  elem.time = nextgs[elem.host][elem.nic];
+                  elem.time = resource_time;
                   lgs_interface->aq.push(std::move(elem));
                   if (nexto[elem.host][elem.proc] > nextgs[elem.host][elem.nic])
                       num_reinserts_g++;
@@ -751,7 +758,7 @@ int start_lgs(std::string filename_goal, LogSimInterface &lgs) {
                     //assert(elem.time >= nexto[elem.host][cpu]);
 
                     uint64_t nic_time = std::max(nextgr[elem.host][elem.nic], elem.time) + g;
-                    uint64_t cpu_time = nic_time + lgs_interface->lgs_o + noise + (elem.size-1) * 0;
+                    uint64_t cpu_time = nic_time + 0 + noise + (elem.size-1) * 0;
 
                     nexto[elem.host][cpu] = cpu_time;
                     nextgr[elem.host][elem.nic] = nic_time;

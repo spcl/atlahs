@@ -5,3 +5,4 @@
 *#
 *.o
 .DS_store
+tests/htsim_bidir_ndp

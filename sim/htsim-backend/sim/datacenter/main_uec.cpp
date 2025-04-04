@@ -604,7 +604,7 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    eventlist.setEndtime(timeFromSec((uint32_t)20));
+    eventlist.setEndtime(timeFromSec((uint32_t)60));
 
     // Calculate Network Info
     int hops = 4; // hardcoded for now
