@@ -19,6 +19,7 @@
 #include "firstfit.h"
 #include "topology.h"
 #include "queue_lossless_input.h"
+#include "logsim-interface.h"
 #include "connection_matrix.h"
 
 #include "fat_tree_topology.h"
@@ -78,7 +79,7 @@ int main(int argc, char **argv) {
     linkspeed_bps linkspeed = speedFromMbps((double)HOST_NIC);
     int packet_size = 9000;
     uint32_t path_entropy_size = 10000000;
-    uint32_t no_of_conns = 0, cwnd = 15, no_of_nodes = DEFAULT_NODES;
+    uint32_t no_of_conns = 0, cwnd = 50, no_of_nodes = DEFAULT_NODES;
     uint32_t tiers = 3; // we support 2 and 3 tier fattrees
     double logtime = 0.25; // ms;
     stringstream filename(ios_base::out);
@@ -90,6 +91,7 @@ int main(int argc, char **argv) {
     bool rts = false;
     bool log_tor_downqueue = false;
     bool log_tor_upqueue = false;
+    int percentage_lgs = 0;
     bool log_traffic = false;
     bool log_switches = false;
     bool log_queue_usage = false;
@@ -112,6 +114,7 @@ int main(int argc, char **argv) {
 
     char* tm_file = NULL;
     char* topo_file = NULL;
+    string goal_filename = "";
 
     while (i<argc) {
         if (!strcmp(argv[i],"-o")) {
@@ -128,6 +131,9 @@ int main(int argc, char **argv) {
             end_time = atoi(argv[i+1]);
             cout << "endtime(us) "<< end_time << endl;
             i++;            
+        } else if (!strcmp(argv[i], "-goal")) {
+            goal_filename = argv[i + 1];
+            i++;
         } else if (!strcmp(argv[i],"-rts")) {
             rts = true;
             cout << "rts enabled "<< endl;
@@ -233,6 +239,9 @@ int main(int argc, char **argv) {
             i++;
         } else if (!strcmp(argv[i],"-mtu")){
             packet_size = atoi(argv[i+1]);
+            i++;
+        } else if (!strcmp(argv[i], "-percentage_lgs")) {
+            percentage_lgs = atoi(argv[i + 1]);
             i++;
         } else if (!strcmp(argv[i],"-paths")){
             path_entropy_size = atoi(argv[i+1]);
@@ -378,7 +387,14 @@ int main(int argc, char **argv) {
     LosslessInputQueue::_low_threshold = Packet::data_packet_size()*low_pfc;
 
 
-    eventlist.setEndtime(timeFromUs((uint32_t)end_time));
+
+    if (end_time != -1) {
+        eventlist.setEndtime(timeFromMs(end_time));
+    } else {
+        
+    }
+
+    eventlist.setEndtime(timeFromSec(10));
     queuesize = memFromPkt(queuesize);
     
     switch (route_strategy) {
@@ -417,19 +433,9 @@ int main(int argc, char **argv) {
 
     cout << "Logging to " << filename.str() << endl;
     //Logfile 
-    Logfile logfile(filename.str(), eventlist);
 
     cout << "Linkspeed set to " << linkspeed/1000000000 << "Gbps" << endl;
-    logfile.setStartTime(timeFromSec(0));
 
-    NdpSinkLoggerSampling sinkLogger = NdpSinkLoggerSampling(timeFromMs(logtime), eventlist);
-    if (log_sink) {
-        logfile.addLogger(sinkLogger);
-    }
-    NdpTrafficLogger traffic_logger = NdpTrafficLogger();
-    if (log_traffic) {
-        logfile.addLogger(traffic_logger);
-    }
 
 #if PRINT_PATHS
     filename << ".paths";
@@ -452,23 +458,15 @@ int main(int argc, char **argv) {
     Route* routeout, *routein;
 
     // scanner interval must be less than min RTO
-    NdpRtxTimerScanner ndpRtxScanner(timeFromUs((uint32_t)9), eventlist);
+    //NdpRtxTimerScanner ndpRtxScanner(timeFromUs((uint32_t)20), eventlist);
    
-    QueueLoggerFactory *qlf = 0;
-    if (log_tor_downqueue || log_tor_upqueue) {
-        qlf = new QueueLoggerFactory(&logfile, QueueLoggerFactory::LOGGER_SAMPLING, eventlist);
-        qlf->set_sample_period(timeFromUs(10.0));
-    } else if (log_queue_usage) {
-        qlf = new QueueLoggerFactory(&logfile, QueueLoggerFactory::LOGGER_EMPTY, eventlist);
-        qlf->set_sample_period(timeFromUs(10.0));
-    }
 #ifdef FAT_TREE
     FatTreeTopology* top;
     if (topo_file) {
-        top = FatTreeTopology::load(topo_file, qlf, eventlist, queuesize, qt, snd_type);
+        top = FatTreeTopology::load(topo_file, NULL, eventlist, queuesize, qt, snd_type);
     } else {
         FatTreeTopology::set_tiers(tiers);
-        top = new FatTreeTopology(no_of_nodes, linkspeed, queuesize, qlf, 
+        top = new FatTreeTopology(no_of_nodes, linkspeed, queuesize, NULL, 
                                   &eventlist, NULL, qt, hop_latency,
                                   switch_latency,
                                   snd_type);
@@ -497,10 +495,6 @@ int main(int argc, char **argv) {
     VL2Topology* top = new VL2Topology(lf, &eventlist,ff);
 #endif
 
-    if (log_switches) {
-        top->add_switch_loggers(logfile, timeFromUs(20.0));
-    }
-
     vector<const Route*>*** net_paths;
     net_paths = new vector<const Route*>**[no_of_nodes];
 
@@ -520,6 +514,7 @@ int main(int argc, char **argv) {
     }
     
     ConnectionMatrix* conns = new ConnectionMatrix(no_of_nodes);
+    LogSimInterface *lgs = NULL;
 
     if (tm_file){
         cout << "Loading connection matrix from  " << tm_file << endl;
@@ -529,10 +524,7 @@ int main(int argc, char **argv) {
             exit(-1);
         }
     }
-    else {
-        cout << "Loading connection matrix from  standard input" << endl;        
-        conns->load(cin);
-    }
+    else {    }
 
     if (conns->N != no_of_nodes){
         cout << "Connection matrix number of nodes is " << conns->N << " while I am using " << no_of_nodes << endl;
@@ -557,6 +549,38 @@ int main(int argc, char **argv) {
 
     vector<connection*>* all_conns = conns->getAllConnections();
     vector <NdpSrc*> ndp_srcs;
+
+
+    if (goal_filename.size() > 0) {
+        AtlahsHtsimApi *api = new AtlahsHtsimApi();
+        api->setTopology(top);
+        api->setEventList(&eventlist);
+        api->setComputeEvent(new ComputeEvent(eventlist));
+        api->setNullEvent(new NullEvent(eventlist));
+        lgs = new LogSimInterface(NULL, NULL, eventlist, top, nullptr);
+        api->setLogSimInterface(lgs);
+        lgs->htsim_api = api;
+        lgs->set_protocol(NDP_PROTOCOL);
+        lgs->htsim_api->linkspeed = linkspeed;
+        lgs->percentage_lgs = percentage_lgs;
+
+        double linkSpeedBytesPerSec = (linkspeed/1000000000 * 1e9) / 8.0;
+
+        // Calculate G in cycles
+        lgs->htsim_api->htsim_G  = 1e9 / linkSpeedBytesPerSec;
+
+        printf("<HTSIM> G %f\n", lgs->htsim_api->htsim_G);
+
+        lgs->htsim_api->total_nodes = no_of_nodes;
+        lgs->htsim_api->Setup();
+        printf("Started LGS\n");
+        
+        
+        start_lgs(goal_filename, *lgs);
+        printf("Finished all\n");
+        fflush(stdout);
+        return 0;
+    }
 
     for (size_t c = 0; c < all_conns->size(); c++){
         connection* crt = all_conns->at(c);
@@ -601,7 +625,7 @@ int main(int argc, char **argv) {
 
         ndpSrc = new NdpSrc(NULL, NULL, eventlist,rts);
         ndpSrc->setCwnd(cwnd*Packet::data_packet_size());
-        ndp_srcs.push_back(ndpSrc);
+        //ndp_srcs.push_back(ndpSrc);
         ndpSrc->set_dst(dest);
         ndpSrc->set_path_burst(path_burst);
         if (crt->flowid) {
@@ -627,13 +651,10 @@ int main(int argc, char **argv) {
                         
         ndpSrc->setName("ndp_" + ntoa(src) + "_" + ntoa(dest));
 
-        //cout << "ndp_" + ntoa(src) + "_" + ntoa(dest) << endl;
-        logfile.writeName(*ndpSrc);
 
         ndpSnk->set_src(src);
                         
         ndpSnk->setName("ndp_sink_" + ntoa(src) + "_" + ntoa(dest));
-        logfile.writeName(*ndpSnk);
         if (crt->recv_done_trigger) {
             Trigger* trig = conns->getTrigger(crt->recv_done_trigger, eventlist);
             ndpSnk->set_end_trigger(*trig);
@@ -641,7 +662,7 @@ int main(int argc, char **argv) {
 
         ndpSnk->set_priority(crt->priority);
                         
-        ndpRtxScanner.registerNdp(*ndpSrc);
+        //ndpRtxScanner.registerNdp(*ndpSrc);
 
         switch (route_strategy) {
         case SCATTER_PERMUTE:
@@ -720,17 +741,13 @@ int main(int argc, char **argv) {
             }
             delete net_paths[dest][src];
         }
-
-        if (log_sink) {
-            sinkLogger.monitorSink(ndpSnk);
-        }
     }
 
     for (size_t ix = 0; ix < no_of_nodes; ix++) {
         delete path_refcounts[ix];
     }
 
-    Logged::dump_idmap();
+    /* Logged::dump_idmap();
     // Record the setup
     int pktsize = Packet::data_packet_size();
     logfile.write("# pktsize=" + ntoa(pktsize) + " bytes");
@@ -738,21 +755,21 @@ int main(int argc, char **argv) {
     //logfile.write("# corelinkrate = " + ntoa(HOST_NIC*CORE_TO_HOST) + " pkt/sec");
     //logfile.write("# buffer = " + ntoa((double) (queues_na_ni[0][1]->_maxsize) / ((double) pktsize)) + " pkt");
     double rtt = timeAsSec(timeFromUs(RTT));
-    logfile.write("# rtt =" + ntoa(rtt));
+    logfile.write("# rtt =" + ntoa(rtt)); */
     
     // GO!
     cout << "Starting simulation" << endl;
     while (eventlist.doNextEvent()) {
     }
 
-    cout << "Done" << endl;
+    /* cout << "Done" << endl;
     int new_pkts = 0, rtx_pkts = 0, bounce_pkts = 0;
     for (size_t ix = 0; ix < ndp_srcs.size(); ix++) {
         new_pkts += ndp_srcs[ix]->_new_packets_sent;
         rtx_pkts += ndp_srcs[ix]->_rtx_packets_sent;
         bounce_pkts += ndp_srcs[ix]->_bounces_received;
     }
-    cout << "New: " << new_pkts << " Rtx: " << rtx_pkts << " Bounced: " << bounce_pkts << endl;
+    cout << "New: " << new_pkts << " Rtx: " << rtx_pkts << " Bounced: " << bounce_pkts << endl; */
     /*
     list <const Route*>::iterator rt_i;
     int counts[10]; int hop;

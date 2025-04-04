@@ -66,6 +66,8 @@ EventList::doNextEvent()
 void 
 EventList::sourceIsPending(EventSource &src, simtime_picosec when) 
 {
+    // /printf("EventList::sourceIsPending at %lu ps vs now %lu \n", when, now());
+    //fflush(stdout);
     assert(when>=now());
     if (_endtime==0 || when<_endtime)
         _pendingsources.insert(make_pair(when,&src));

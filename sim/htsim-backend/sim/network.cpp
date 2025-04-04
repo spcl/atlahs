@@ -195,6 +195,24 @@ Packet::str() const {
     case NDPLITERTS:
         s = "NDPLITERTS";
         break;
+        case UEC:
+        s = "UEC";
+        break;
+    case UECACK:
+        s = "UECACK";
+        break;
+    case UECNACK:
+        s = "UECNACK";
+        break;
+    case UEC_DROP:
+        s = "UEC_DROP";
+        break;
+    case UECACK_DROP:
+        s = "UECACK_DROP";
+        break;
+    case UECNACK_DROP:
+        s = "UECNACK_DROP";
+        break;
     case NDPLITEPULL:
         s = "NDPLITEPULL";
         break;

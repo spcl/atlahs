@@ -1,11 +1,11 @@
 SUBDIRS=tests datacenter
-OBJS=eventlist.o tcppacket.o pipe.o queue.o meter.o queue_lossless.o queue_lossless_input.o queue_lossless_output.o ecnqueue.o tcp.o dctcp.o mtcp.o loggers.o logfile.o clock.o config.o network.o qcn.o exoqueue.o randomqueue.o cbr.o cbrpacket.o sent_packets.o ndp.o ndptunnel.o ndppacket.o roce.o rocepacket.o eth_pause_packet.o tcp_transfer.o tcp_periodic.o compositequeue.o prioqueue.o cpqueue.o ndp_transfer.o compositeprioqueue.o switch.o dctcp_transfer.o fairpullqueue.o route.o callback_pipe.o ndptunnelpacket.o swiftpacket.o swift.o swift_scheduler.o routetable.o trigger.o hpccpacket.o hpcc.o strackpacket.o strack.o priopullqueue.o rng.o ecnprioqueue.o eqdspacket.o eqds.o eqds_logger.o aeolusqueue.o
-HDRS=network.h ndp.h ndptunnel.h queue_lossless.h queue_lossless_input.h queue_lossless_output.h compositequeue.h prioqueue.h cpqueue.h queue.h loggers.h loggertypes.h pipe.h eventlist.h config.h tcp.h dctcp.h mtcp.h sent_packets.h tcppacket.h ndppacket.h rocepacket.h eth_pause_packet.h ndp_transfer.h compositeprioqueue.h ecnqueue.h switch.h dctcp_transfer.h callback_pipe.h meter.h ndptunnelpacket.h swiftpacket.h swift.h swift_scheduler.h routetable.h circular_buffer.h trigger.h hpccpacket.h hpcc.h strackpacket.h strack.h priopullqueue.h ecnprioqueue.h eqdspacket.h eqds.h eqds_logger.h aeolusqueue.h
+OBJS=eventlist.o tcppacket.o pipe.o queue.o meter.o queue_lossless.o queue_lossless_input.o queue_lossless_output.o ecnqueue.o tcp.o dctcp.o mtcp.o loggers.o logfile.o clock.o config.o network.o qcn.o exoqueue.o randomqueue.o cbr.o cbrpacket.o sent_packets.o ndp.o ndptunnel.o ndppacket.o roce.o rocepacket.o eth_pause_packet.o tcp_transfer.o tcp_periodic.o compositequeue.o prioqueue.o cpqueue.o ndp_transfer.o compositeprioqueue.o switch.o dctcp_transfer.o fairpullqueue.o route.o callback_pipe.o ndptunnelpacket.o swiftpacket.o swift.o swift_scheduler.o routetable.o trigger.o hpccpacket.o uec.o uecpacket.o hpcc.o strackpacket.o strack.o priopullqueue.o rng.o ecnprioqueue.o eqdspacket.o eqds.o eqds_logger.o aeolusqueue.o null_event.o compute_event.o
+HDRS=network.h ndp.h ndptunnel.h queue_lossless.h queue_lossless_input.h queue_lossless_output.h compositequeue.h prioqueue.h cpqueue.h queue.h loggers.h loggertypes.h pipe.h eventlist.h config.h tcp.h dctcp.h mtcp.h sent_packets.h tcppacket.h ndppacket.h rocepacket.h eth_pause_packet.h ndp_transfer.h compositeprioqueue.h ecnqueue.h switch.h dctcp_transfer.h callback_pipe.h meter.h ndptunnelpacket.h swiftpacket.h swift.h swift_scheduler.h routetable.h circular_buffer.h trigger.h hpccpacket.h hpcc.h strackpacket.h strack.h priopullqueue.h ecnprioqueue.h eqdspacket.h eqds.h eqds_logger.h aeolusqueue.h compute_event.h null_event.h uec.h uecpacket.h
 
 CC=g++
 CFLAGS = -Wall -std=c++11 -g -Wsign-compare -Wuninitialized -fPIE
 #CFLAGS += -fsanitize=address -fno-omit-frame-pointer -fsanitize=undefined
-CFLAGS += -O3
+CFLAGS += -O3 
 
 all:	libhtsim.a parse_output $(SUBDIRS)
 
@@ -95,6 +95,8 @@ tcppacket.o:	tcppacket.cpp $(HDRS)
 swiftpacket.o:	swiftpacket.cpp $(HDRS)
 strackpacket.o:	strackpacket.cpp $(HDRS)
 loggers.o:	loggers.cpp $(HDRS)
+compute_event.o: compute_event.cpp $(HDRS)
+null_event.o: null_event.cpp $(HDRS)
 logfile.o:	logfile.cpp  $(HDRS)
 trigger.o:	trigger.cpp  $(HDRS)
 hpccpacket.o:	hpccpacket.cpp  $(HDRS)
@@ -112,6 +114,8 @@ roce.o: roce.cpp $(HDRS)
 hpcc.o: hpcc.cpp $(HDRS)
 qcn.o: qcn.cpp qcn.h loggers.h config.h 
 aeolusqueue.o: aeolusqueue.cpp $(HDRS)
+uecpacket.o: uecpacket.cpp $(HDRS)
+uec.o: uec.cpp $(HDRS)
 
 .cpp.o:
 	source='$<' object='$@' libtool=no depfile='$(DEPDIR)/$*.Po' tmpdepfile='$(DEPDIR)/$*.TPo' $(CXXDEPMODE) $(depcomp) $(CC) $(CFLAGS)  -c -o $@ `test -f $< || echo '$(srcdir)/'`$<

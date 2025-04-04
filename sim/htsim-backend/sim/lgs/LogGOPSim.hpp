@@ -3,6 +3,10 @@
 #ifndef GRAPH_NODE_PROPERTIES
 #define GRAPH_NODE_PROPERTIES 1
 
+#define STRICT_ORDER // this is needed to keep order between Send/Recv and LocalOps in NBC case :-/
+// #define LIST_MATCH // enables debugging the queues (check if empty)
+#define HOSTSYNC // this is experimental to count synchronization times induced by message transmissions
+
 typedef uint64_t btime_t;
   
 /* this class is CRITICAL -- keep it as SMALL as possible! 
@@ -31,6 +35,7 @@ class graph_node_properties {
 		uint8_t proc;							// processing element for this operation
 		uint8_t nic;							// network interface for this operation
 		char type;							  // see below
+    bool updated = false;
 };
 
 /* this is a comparison functor that can be used to compare and sort
@@ -61,7 +66,8 @@ class aqcompare_func {
 static const int OP_SEND = 1;
 static const int OP_RECV = 2;
 static const int OP_LOCOP = 3;
-static const int OP_MSG = 4;
+static const int OP_LOCOP_IN_PROGRESS = 4;
+static const int OP_MSG = 5;
 		
 static const uint32_t ANY_SOURCE = ~0;
 static const uint32_t ANY_TAG = ~0;

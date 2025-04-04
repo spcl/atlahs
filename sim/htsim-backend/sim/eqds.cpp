@@ -367,6 +367,7 @@ void EqdsSrc::receivePacket(Packet &pkt) {
         }
     case EQDSACK:
         {
+            
             processAck((const EqdsAckPacket&)pkt);
             pkt.free();
             return;
@@ -455,7 +456,7 @@ void EqdsSrc::handlePull(EqdsBasePacket::pull_quanta pullno) {
     }
 }
 
-bool EqdsSrc::checkFinished(EqdsDataPacket::seq_t cum_ack) {
+bool EqdsSrc::checkFinished(EqdsDataPacket::seq_t cum_ack, const EqdsAckPacket& pkt) {
     // cum_ack gives the next expected packet
     if (_done_sending) {
         // if (EqdsSrc::_debug) cout << _nodename << " checkFinished done sending " << " cum_acc " << cum_ack << " mss " << _mss << " c*m " << cum_ack * _mss << endl;
@@ -470,10 +471,17 @@ bool EqdsSrc::checkFinished(EqdsDataPacket::seq_t cum_ack) {
         if (_end_trigger) {
             _end_trigger->activate();
         }
-        if (_flow_logger) {
-            _flow_logger->logEvent(_flow, *this, FlowEventLogger::FINISH, _flow_size, cum_ack);
-        }
+
         _done_sending = true;
+
+        printf("Completion Time Flow is %f - Start Time %f - Overall Time %f\n", timeAsUs(eventlist().now() - _flow_start_time), timeAsUs(_flow_start_time), timeAsUs(eventlist().now()));
+
+        EventOver *flow_over = new EventOver(from, to, _flow_size, tag, eventlist().now(), AtlahsEventType::SEND_EVENT_OVER);
+        flow_over->node = lgs_node;
+        //flow_over->setPacket(&pkt);
+        if (_atlahs_api)
+            _atlahs_api->EventFinished(*flow_over);
+
         return true;
     }
     return false;
@@ -509,7 +517,7 @@ void EqdsSrc::processAck(const EqdsAckPacket& pkt) {
         penalizePath(pkt.ev(), 1);
     }
 
-    if (checkFinished(cum_ack)) {
+    if (checkFinished(cum_ack, pkt)) {
         stopSpeculating();
         return;
     }
@@ -521,6 +529,8 @@ void EqdsSrc::processAck(const EqdsAckPacket& pkt) {
 void EqdsSrc::processNack(const EqdsNackPacket& pkt) {
     //auto pullno = pkt.pullno();
     //handlePull(pullno);
+
+    printf("NACK\n");
 
     auto nacked_seqno = pkt.ref_ack();
     if (_debug_src) 
@@ -608,9 +618,7 @@ void EqdsSrc::startFlow() {
     _cwnd = _maxwnd;
     _credit_spec = _maxwnd;
     if (_debug_src) cout << "startflow " <<  _flow._name <<  " CWND " << _cwnd << " at " << timeAsUs(eventlist().now()) << " flow " << _flow.str() << endl;
-    if (_flow_logger) {
-        _flow_logger->logEvent(_flow, *this, FlowEventLogger::START, _flow_size, 0);
-    }
+    _flow_start_time = eventlist().now();
     clearRTO();
     _in_flight = 0;
     _pull_target = 0;
@@ -859,8 +867,12 @@ mem_b EqdsSrc::sendNewPacket() {
         // we can't send because we're not in speculative mode and only had speculative credit
         return 0;
     }
+    //printf("Flow %s flowId %d received SEND at %f\n", _name.c_str(), flowId(), timeAsUs(eventlist().now()));
+
+    
 
     _backlog -= full_pkt_size;
+
     assert(_backlog >= 0);
     _unsent -= payload_size;
     assert(_backlog >= _unsent);
@@ -885,6 +897,9 @@ mem_b EqdsSrc::sendNewPacket() {
     _highest_sent++;
     _new_packets_sent++;
     startRTO(eventlist().now());
+    /* if (_backlog <= 0) {
+        _atlahs_api->send_done_return_control = true;
+    } */
     return full_pkt_size;
 }
 

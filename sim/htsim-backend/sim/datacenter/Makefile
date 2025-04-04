@@ -1,25 +1,26 @@
 CC = g++
 CFLAGS = -Wall -std=c++11 -g -Wsign-compare
 #CFLAGS += -fsanitize=address -fno-omit-frame-pointer -fsanitize=undefined
-CFLAGS += -O2  
+CFLAGS += -O3
 CRT=`pwd`
 INCLUDE= -I/$(CRT)/.. -I$(CRT) 
 LIB=-L..
 DEPS=../libhtsim.a
 
-all:	htsim_eqds
+all:	htsim_eqds htsim_ndp htsim_uec
 
 
 htsim_tcp: main_tcp.o firstfit.o ../libhtsim.a vl2_topology.o fat_tree_topology.o fat_tree_switch.o dragon_fly_topology.o bcube_topology.o connection_matrix.o oversubscribed_fat_tree_topology.o shortflows.o multihomed_fat_tree_topology.o star_topology.o
 	$(CC) $(CFLAGS) main_tcp.o firstfit.o vl2_topology.o dragon_fly_topology.o fat_tree_topology.o fat_tree_switch.o bcube_topology.o connection_matrix.o oversubscribed_fat_tree_topology.o shortflows.o star_topology.o multihomed_fat_tree_topology.o $(LIB) -lhtsim -o htsim_tcp
 
-
-htsim_ndp: main_ndp.o firstfit.o ../libhtsim.a vl2_topology.o fat_tree_topology.o bcube_topology.o connection_matrix.o oversubscribed_fat_tree_topology.o shortflows.o multihomed_fat_tree_topology.o star_topology.o fat_tree_switch.o
-	$(CC) $(CFLAGS) firstfit.o main_ndp.o vl2_topology.o fat_tree_topology.o fat_tree_switch.o bcube_topology.o connection_matrix.o oversubscribed_fat_tree_topology.o shortflows.o star_topology.o multihomed_fat_tree_topology.o $(LIB) -lhtsim -o htsim_ndp
+htsim_ndp: main_ndp.o firstfit.o ../libhtsim.a vl2_topology.o fat_tree_topology.o bcube_topology.o connection_matrix.o oversubscribed_fat_tree_topology.o shortflows.o multihomed_fat_tree_topology.o star_topology.o fat_tree_switch.o logsim-interface.o atlahs_htsim_api.o
+	$(CC)  $(CFLAGS) $^ $(LIB) -lhtsim -o htsim_ndp
 
 htsim_eqds: main_eqds.o firstfit.o ../libhtsim.a vl2_topology.o fat_tree_topology.o bcube_topology.o connection_matrix.o oversubscribed_fat_tree_topology.o shortflows.o multihomed_fat_tree_topology.o star_topology.o fat_tree_switch.o logsim-interface.o atlahs_htsim_api.o
-	$(CC) $(CFLAGS) firstfit.o main_eqds.o vl2_topology.o fat_tree_topology.o fat_tree_switch.o bcube_topology.o connection_matrix.o oversubscribed_fat_tree_topology.o shortflows.o star_topology.o multihomed_fat_tree_topology.o $(LIB) -lhtsim -o htsim_eqds
+	$(CC)  $(CFLAGS) $^ $(LIB) -lhtsim -o htsim_eqds
 
+htsim_uec: main_uec.o firstfit.o ../libhtsim.a vl2_topology.o fat_tree_topology.o bcube_topology.o connection_matrix.o oversubscribed_fat_tree_topology.o shortflows.o multihomed_fat_tree_topology.o star_topology.o fat_tree_switch.o logsim-interface.o atlahs_htsim_api.o
+	$(CC)  $(CFLAGS) $^ $(LIB) -lhtsim -o htsim_uec
 
 htsim_roce: main_roce.o firstfit.o ../libhtsim.a vl2_topology.o fat_tree_topology.o bcube_topology.o connection_matrix.o oversubscribed_fat_tree_topology.o shortflows.o multihomed_fat_tree_topology.o star_topology.o fat_tree_switch.o
 	$(CC) $(CFLAGS) firstfit.o main_roce.o vl2_topology.o fat_tree_topology.o fat_tree_switch.o bcube_topology.o connection_matrix.o oversubscribed_fat_tree_topology.o shortflows.o star_topology.o multihomed_fat_tree_topology.o $(LIB) -lhtsim -o htsim_roce
@@ -41,6 +42,12 @@ main_ndp.o: main_ndp.cpp ${DEPS}
 main_roce.o: main_roce.cpp ${DEPS}
 	$(CC) $(INCLUDE) $(CFLAGS) -c main_roce.cpp
 
+main_eqds.o: main_eqds.cpp ../lgs/logsim.h logsim-interface.h
+	$(CC) $(INCLUDE) $(CFLAGS) -c main_eqds.cpp 
+
+main_uec.o: main_uec.cpp ../lgs/logsim.h logsim-interface.h
+	$(CC) $(INCLUDE) $(CFLAGS) -c main_uec.cpp 
+
 main_hpcc.o: main_hpcc.cpp ${DEPS}
 	$(CC) $(INCLUDE) $(CFLAGS) -c main_hpcc.cpp 
 
@@ -55,6 +62,9 @@ generic_topology.o: generic_topology.cpp generic_topology.h ${DEPS}
 
 logsim-interface.o: logsim-interface.cpp atlahs_htsim_api.cpp
 	$(CC) $(INCLUDE) $(CFLAGS) -c $< $(LIB)
+
+atlahs_htsim_api.o: atlahs_htsim_api.cpp
+	$(CC) $(INCLUDE) $(CFLAGS) -c atlahs_htsim_api.cpp $(LIB)
 
 shortflows.o: shortflows.cpp ${DEPS}
 	$(CC) $(INCLUDE) $(CFLAGS) -c shortflows.cpp 
@@ -95,11 +105,8 @@ multihomed_fat_tree_topology.o: multihomed_fat_tree_topology.cpp multihomed_fat_
 fat_tree_switch.o: fat_tree_switch.h fat_tree_switch.cpp ${DEPS}
 	$(CC) $(INCLUDE) $(CFLAGS) -c fat_tree_switch.cpp
 
-atlahs_htsim_api.o: atlahs_htsim_api.cpp
-	$(CC) $(INCLUDE) $(CFLAGS) -c atlahs_htsim_api.cpp $(LIB)
 
-main_eqds.o: main_eqds.cpp ../lgs/logsim.h logsim-interface.h
-	$(CC) $(INCLUDE) $(CFLAGS) -c main_eqds.cpp 
+
 
 clean:	
 	rm -f *.o htsim_ndp* htsim_swift* htsim_tcp* htsim_dctcp* htsim_roce* htsim_hpcc*

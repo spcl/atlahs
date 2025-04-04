@@ -13,6 +13,7 @@ class PacketFlow;
 class PacketSink;
 typedef uint32_t packetid_t;
 typedef uint32_t flowid_t;
+class graph_node_properties;
 
 void print_route(const Route& route);
 
@@ -48,7 +49,24 @@ typedef enum {IP, TCP, TCPACK, TCPNACK, SWIFT, SWIFTACK, STRACK, STRACKACK,
               ETH_PAUSE, TOFINO_TRIM,
               ROCE, ROCEACK, ROCENACK,
               HPCC, HPCCACK, HPCCNACK,
-              EQDSDATA, EQDSPULL, EQDSACK, EQDSNACK, EQDSRTS} packet_type;
+              EQDSDATA, EQDSPULL, EQDSACK, EQDSNACK, EQDSRTS, UEC, UECACK, UECNACK, UEC_DROP, UECACK_DROP,UECNACK_DROP } packet_type;
+
+
+enum RouteStrategy
+{
+    NOT_SET,
+    SINGLE_PATH,
+    SCATTER_PERMUTE,
+    SCATTER_RANDOM,
+    PULL_BASED,
+    SCATTER_ECMP,
+    ECMP_FIB,
+    ECMP_FIB_ECN,
+    REACTIVE_ECN,
+    ECMP_FIB2_ECN,
+    ECMP_RANDOM2_ECN,
+    ECMP_RANDOM_ECN
+};
 
 typedef enum {NONE, UP, DOWN} packet_direction;
 
@@ -162,6 +180,8 @@ class Packet {
 
 
     int from, to, tag;
+    bool is_ack = false;
+
  protected:
     void set_attrs(PacketFlow& flow, int pkt_size, packetid_t id);
 
@@ -218,6 +238,27 @@ class PacketSink {
     virtual const string& nodename()=0;
 
     PacketSink* _remoteEndpoint;
+
+    uint32_t from = -1;
+    uint32_t to = -1;
+    uint32_t tag;
+
+    uint64_t lgs_time;
+    uint64_t lgs_starttime;         // only used for MSGs to identify start times
+    uint64_t lgs_syncstart;
+
+    uint64_t lgs_ts; /* this is a timestamp that determines the (original) insertion order of 
+                  elements in the queue, it is increased for every new element, not for 
+                  re-insertions! Needed for correctness. */
+    uint64_t lgs_size;						// number of bytes to send, recv, or time to spend in loclop
+    uint32_t lgs_target;					// partner for send/recv
+    uint32_t lgs_host;            // owning host 
+    uint32_t lgs_offset;          // for Parser (to identify schedule element)
+    uint32_t lgs_tag;							// tag for send/recv
+    uint32_t lgs_handle;          // handle for network layer :-/
+    uint8_t lgs_proc;							// processing element for this operation
+    uint8_t lgs_nic;							// network interface for this operation
+    char lgs_type;							  // see below
 };
 
 
@@ -231,8 +272,8 @@ class PacketDB {
  public:
     PacketDB() : _alloc_count(0) {}
     ~PacketDB() {
-        //cout << "Pkt count: " << _alloc_count << endl;
-        //cout << "Pkt mem used: " << _alloc_count * sizeof(P) << endl;
+        for (P* p : _freelist)
+            delete p;
     }
     P* allocPacket() {
         if (_freelist.empty()) {
@@ -260,9 +301,11 @@ class PacketDB {
             _freelist.push_back(pkt);
     };
 
+    int _alloc_count;
+
  protected:
     vector<P*> _freelist; // Irek says it's faster with vector than with list
-    int _alloc_count;
+    
 };
 
 

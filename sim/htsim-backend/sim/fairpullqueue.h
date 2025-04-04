@@ -7,6 +7,8 @@
  */
 
 #include <list>
+#include <map>
+#include <memory>   // Added for std::unique_ptr
 #include "config.h"
 #include "eventlist.h"
 #include "network.h"
@@ -39,7 +41,7 @@ class FifoPullQueue : public BasePullQueue<PullPkt>{
     virtual PullPkt* dequeue();
     virtual void flush_flow(flowid_t flow_id, int priority = 0);
  protected:
-    list <PullPkt*> _pull_queue; // needs insert middle, so can't use circular buffer
+    std::list<PullPkt*> _pull_queue; // needs insert middle, so can't use circular buffer
 };
 
 template<class PullPkt>
@@ -50,11 +52,12 @@ class FairPullQueue : public BasePullQueue<PullPkt>{
     virtual PullPkt* dequeue();
     virtual void flush_flow(flowid_t flow_id, int priority = 0);
  protected:
-    map<flowid_t, CircularBuffer<PullPkt*>*> _queue_map;  // map flow id to pull queue
+    // Use unique_ptr to manage CircularBuffer objects automatically.
+    std::map<flowid_t, std::unique_ptr<CircularBuffer<PullPkt*>>> _queue_map;
     bool queue_exists(const PullPkt& pkt);
     CircularBuffer<PullPkt*>* find_queue(const PullPkt& pkt);
     CircularBuffer<PullPkt*>* create_queue(const PullPkt& pkt);
-    typename map<flowid_t, CircularBuffer<PullPkt*>*>::iterator _current_queue;
+    typename std::map<flowid_t, std::unique_ptr<CircularBuffer<PullPkt*>>>::iterator _current_queue;
 };
 
 #endif

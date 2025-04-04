@@ -144,6 +144,8 @@ Queue::completeService()
     //_enqueued.pop_back();
     Packet* pkt = _enqueued.pop();
     _queuesize -= pkt->size();
+
+    //printf("Decreasing at %lu %d\n",eventlist().now(), pkt->size());
     pkt->flow().logTraffic(*pkt, *this, TrafficLogger::PKT_DEPART);
     if (_logger) _logger->logQueue(*this, QueueLogger::PKT_SERVICE, *pkt);
 
@@ -474,9 +476,13 @@ FairPriorityQueue::receivePacket(Packet& pkt)
 
     if (queuesize() > _maxsize && queuesize()/1000000 != (queuesize()+pkt.size())/1000000){
         //pkt.free();
-        cout << "Host Queue size " << queuesize() << endl;
+        //cout << "Host Queue size " << queuesize() << endl;
         //return;
     }
+
+    //cout << "Host Queue size " << queuesize() << endl;
+
+    //printf("Host Size is %lu at %lu - %s\n", queuesize(), eventlist().now(), _nodename.c_str());
 
     _queuesize[prio] += pkt.size();
     _queue[prio].enqueue(pkt);
@@ -500,6 +506,9 @@ FairPriorityQueue::beginService()
             _sending = _queue[prio].dequeue();
 
             assert (_sending != NULL);
+
+            //printf("Decreasing2 at %lu drain time %d\n",eventlist().now(), drainTime(_sending));
+
             eventlist().sourceIsPendingRel(*this, drainTime(_sending));
             _servicing = (queue_priority_t)prio;
             return;
@@ -520,6 +529,8 @@ FairPriorityQueue::completeService()
         /* dequeue the packet */
         Packet* pkt = _sending;
         _queuesize[_servicing] -= pkt->size();
+
+        //printf("Decreasing1 at %lu %d\n",eventlist().now(), queuesize());
 
         _sending = NULL;
 

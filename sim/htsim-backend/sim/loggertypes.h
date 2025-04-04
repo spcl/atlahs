@@ -21,6 +21,7 @@ class MultipathTcpSrc;
 class Logfile;
 class RawLogEvent;
 class Logged;
+class UecSrc;
 
 // keep track of all logged items so we can do ID->Name mapping later
 class LoggedManager {
@@ -128,6 +129,16 @@ class TcpLogger  : public Logger {
     virtual void logTcp(TcpSrc &src, TcpEvent ev) =0;
     virtual ~TcpLogger(){};
 };
+
+class UecLogger : public Logger {
+    public:
+      enum UecEvent { UEC_RCV = 0, UEC_TIMEOUT = 1 }; // TODO: add more events
+      enum UecState { UECSTATE_CNTRL = 0, UECSTATE_SEQ = 1 };
+      enum UecRecord { AVE_CWND = 0 };
+      enum UecMemoryRecord { MEMORY = 0 };
+      virtual void logUec(UecSrc &src, UecEvent ev) = 0;
+      virtual ~UecLogger(){};
+  };
 
 class SwiftLogger  : public Logger {
  public:

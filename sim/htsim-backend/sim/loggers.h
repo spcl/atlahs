@@ -13,6 +13,8 @@
 #include "ndp.h"
 #include "roce.h"
 #include "hpcc.h"
+#include "uec.h"
+
 #include "mtcp.h"
 #include "qcn.h"
 #include <list>

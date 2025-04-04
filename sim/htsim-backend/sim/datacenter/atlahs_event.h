@@ -2,6 +2,7 @@
 #define ATLAHS_EVENT_H
 
 #include <cstdint>
+#include "../lgs/LogGOPSim.hpp"
 
 enum class AtlahsEventType {
     SEND_EVENT_OVER,
@@ -57,6 +58,7 @@ public:
     int tag;
     uint64_t start_time_event;
     Packet *pkt;
+    graph_node_properties *node;
     AtlahsEventType event_type; // New field
 
     // Default constructor

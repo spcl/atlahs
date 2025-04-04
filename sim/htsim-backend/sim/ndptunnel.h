@@ -3,7 +3,6 @@
 
 #ifndef NDP_H
 #define NDP_H
-enum RouteStrategy {NOT_SET, SINGLE_PATH, SCATTER_PERMUTE, SCATTER_RANDOM, PULL_BASED};
 
 #endif
 
@@ -239,12 +238,12 @@ class NdpTunnelPullPacer : public EventSource {
 
  private:
     void set_pacerno(Packet *pkt, NdpPull::seq_t pacer_no);
-//#define FIFO_PULL_QUEUE
-//#ifdef FIFO_PULL_QUEUE
-//   FifoPullQueue<NdpPull> _pull_queue;
-//#else
+#define FIFO_PULL_QUEUE
+#ifdef FIFO_PULL_QUEUE
+   FifoPullQueue<NdpPull> _pull_queue;
+#else
     FairPullQueue<NdpPull> _pull_queue;
-    //#endif
+    #endif
     simtime_picosec _last_pull;
     simtime_picosec _packet_drain_time;
     NdpPull::seq_t _pacer_no; // pull sequence number, shared by all connections on this pacer

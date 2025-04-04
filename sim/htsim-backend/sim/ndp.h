@@ -15,6 +15,8 @@
 #include "priopullqueue.h"
 #include "trigger.h"
 #include "eventlist.h"
+#include "datacenter/atlahs_event.h"
+#include "datacenter/atlahs_htsim_api.h"
 
 #define timeInf 0
 #define NDP_PACKET_SCATTER
@@ -28,7 +30,7 @@
 #define RECORD_PATH_LENS // used for debugging which paths lengths packets were trimmed on - mostly useful for BCube
 
 #define DEBUG_PATH_STATS
-enum RouteStrategy {NOT_SET, SINGLE_PATH, SCATTER_PERMUTE, SCATTER_RANDOM, PULL_BASED, SCATTER_ECMP, ECMP_FIB, ECMP_FIB_ECN, REACTIVE_ECN};
+//enum RouteStrategy {NOT_SET, SINGLE_PATH, SCATTER_PERMUTE, SCATTER_RANDOM, PULL_BASED, SCATTER_ECMP, ECMP_FIB, ECMP_FIB_ECN, REACTIVE_ECN};
 
 class NdpSink;
 class NdpRTSPacer;
@@ -52,6 +54,12 @@ class NdpSrc : public PacketSink, public EventSource, public TriggerTarget {
  public:
     NdpSrc(NdpLogger* logger, TrafficLogger* pktlogger, EventList &eventlist, bool rts = false, NdpRTSPacer* pacer = NULL);
     virtual void connect(Route* routeout, Route* routeback, NdpSink& sink, simtime_picosec startTime);
+
+    AtlahsHtsimApi *_atlahs_api = nullptr;
+    uint64_t _flow_start_time;
+    graph_node_properties *lgs_node; // used for logging purposes
+    int simple_numb_paths = 0;
+
 
     void set_dst(uint32_t dst) {_dstaddr = dst;}
     void set_traffic_logger(TrafficLogger* pktlogger);
@@ -232,7 +240,12 @@ class NdpSink : public PacketSink, public DataReceiver {
 
     void add_buffer_logger(ReorderBufferLogger *logger) {
             _buffer_logger = logger;
-    }
+    } 
+
+    int simple_numb_paths = 0;
+    int32_t from_sink = -1;
+    int32_t to_sink = -1;
+    int32_t tag_sink = 0;
  
     void receivePacket(Packet& pkt);
     void process_request_to_send(NdpRTS* rts);
@@ -266,6 +279,9 @@ class NdpSink : public PacketSink, public DataReceiver {
     //needed by all strategies except SINGLE and ECMP_FIB
     void set_paths(vector<const Route*>* rt);
     void set_paths(uint32_t no_of_paths);
+
+
+    
 
 #ifdef RECORD_PATH_LENS
 #define MAX_PATH_LEN 20u

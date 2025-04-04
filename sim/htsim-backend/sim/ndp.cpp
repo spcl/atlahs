@@ -130,7 +130,7 @@ void NdpSrc::set_end_trigger(Trigger& end_trigger) {
 }
 
 void NdpSrc::permute_paths() {
-    int len = _paths.size();
+    int len = simple_numb_paths;
     for (int i = 0; i < len; i++) {
         int ix = random() % (len - i);
         const Route* tmppath = _paths[ix];
@@ -175,28 +175,31 @@ void NdpSrc::set_paths(uint32_t no_of_paths){
 
     _path_ids.resize(no_of_paths);
     permute_sequence(_path_ids);
+    simple_numb_paths = no_of_paths;
 
-    _paths.resize(no_of_paths);
-    _original_paths.resize(no_of_paths);
+    // /printf("Set paths %d\n", no_of_paths);
+
+    
+    //_paths.resize(no_of_paths);
+    /* _original_paths.resize(no_of_paths);
     _path_acks.resize(no_of_paths);
     _path_ecns.resize(no_of_paths);
     _path_nacks.resize(no_of_paths);
     _bad_path.resize(no_of_paths);
     _avoid_ratio.resize(no_of_paths);
-    _avoid_score.resize(no_of_paths);
+    _avoid_score.resize(no_of_paths); */
 
-    for (size_t i=0; i < no_of_paths; i++){
-        _paths[i] = NULL;
-        _original_paths[i] = NULL;
+    for (size_t i=0; i < 0; i++){
+        //_paths[i] = NULL;
+        /* _original_paths[i] = NULL;
         _path_acks[i] = 0;
         _path_ecns[i] = 0;
         _path_nacks[i] = 0;
         _avoid_ratio[i] = 0;
         _avoid_score[i] = 0;
-        _bad_path[i] = false;
+        _bad_path[i] = false; */
     }
 }
-
 
 void NdpSrc::set_paths(vector<const Route*>* rt_list){
     uint32_t no_of_paths = rt_list->size();
@@ -246,6 +249,9 @@ void NdpSrc::set_paths(vector<const Route*>* rt_list){
             //Route* tmp = new Route(*(rt_list->at(i)));
             tmp->add_endpoints(this, _sink);
             tmp->set_path_id(i, rt_list->size());
+
+            printf("WRONG");
+
             _paths[i] = tmp;
             _path_ids[i] = i;
             _original_paths[i] = tmp;
@@ -262,13 +268,13 @@ void NdpSrc::set_paths(vector<const Route*>* rt_list){
             _bad_path[i] = false;
         }
         _crt_path = 0;
-        permute_paths();
+        //permute_paths();
         break;
     }
 }
 
 void NdpSrc::startflow(){
-    cout << "startflow " <<  _flow._name <<  " CWND " << _cwnd << " rts " << _rts << " at " << timeAsUs(eventlist().now()) << endl;
+    //cout << "startflow " <<  _flow._name << " (" << flow_id()  << ") CWND " << _cwnd << " rts " << _rts << " at " << (eventlist().now()) << " size " << _flow_size << endl;
     _highest_sent = 0;
     _last_acked = 0;
     
@@ -332,6 +338,10 @@ void NdpSrc::connect(Route* routeout, Route* routeback, NdpSink& sink, simtime_p
         assert(routeout);
         _route = routeout;
     }
+
+    if (false) {
+        eventlist().sourceIsPending(*this,starttime);
+    }
     
     _sink = &sink;
     _flow.set_id(get_id()); // identify the packet flow with the NDP source that generated it
@@ -361,7 +371,7 @@ void NdpSrc::count_feedback(int32_t path_id, FeedbackType fb) {
 
     /*ECMP_FIB setup needed*/
 
-    int32_t sz = _paths.size();
+    int32_t sz = simple_numb_paths;
     // keep feedback history in a circular buffer
     _feedback_history[_feedback_count] = fb;
     _feedback_count = (_feedback_count + 1) % HIST_LEN;
@@ -462,7 +472,7 @@ void NdpSrc::processRTS(NdpPacket& pkt){
     //_rtx_queue.push_front(&pkt);
     _rtx_queue[pkt.seqno()] = &pkt;
 
-    count_bounce(pkt.route()->path_id());
+    //count_bounce(pkt.route()->path_id());
 
     /* When we get a return-to-sender packet, we could immediately
        resend it, but this leads to a larger-than-necessary second
@@ -513,10 +523,10 @@ void NdpSrc::processNack(const NdpNack& nack){
     bool last_packet = (nack.ackno() + _mss - 1) >= _flow_size;
     _sent_times.erase(nack.ackno());
 
-    count_nack(nack.path_id());
+   /*  count_nack(nack.path_id());
     if (nack.ecn_echo()) {
         count_ecn(nack.path_id());
-    }
+    } */
     /*
     if (_log_me) {
         if (nack.ecn_echo()) {
@@ -531,7 +541,7 @@ void NdpSrc::processNack(const NdpNack& nack){
     switch (_route_strategy) {
     case SINGLE_PATH:
         p = NdpPacket::newpkt(_flow, *_route, seqno, 0, _mss, true,
-                              _paths.size()>0?_paths.size():1, last_packet,_dstaddr);
+                              simple_numb_paths>0?simple_numb_paths:1, last_packet,_dstaddr);
         break;
     case ECMP_FIB:
     case ECMP_FIB_ECN:
@@ -545,7 +555,7 @@ void NdpSrc::processNack(const NdpNack& nack){
     case SCATTER_ECMP: {
         const Route *rt = _paths.at(choose_route());
         p = NdpPacket::newpkt(_flow, *rt, seqno, 0, _mss, true,
-                    _paths.size()>0?_paths.size():1, last_packet,_dstaddr);
+                    simple_numb_paths>0?simple_numb_paths:1, last_packet,_dstaddr);
         break;
     }
     case REACTIVE_ECN: {
@@ -599,14 +609,14 @@ void NdpSrc::processAck(const NdpAck& ack) {
     _first_sent_times.erase(ackno);
     _sent_times.erase(ackno);
 
-    count_ack(path_id);
+    /* count_ack(path_id);
     if (ack.ecn_echo()) {
         count_ecn(path_id);
         if (_route_strategy == REACTIVE_ECN) {
             // switch to next route
             next_route();
         }
-    }
+    } */
     /*
     if (_log_me) {
         if (ack.ecn_echo()) {
@@ -658,10 +668,34 @@ void NdpSrc::processAck(const NdpAck& ack) {
     assert(_flight_size>=0);
 
     if (cum_ackno >= _flow_size){
-        cout << "Flow " << _name << " flow_id " << flow_id() << " finished at " << timeAsUs(eventlist().now()) << " total bytes " << cum_ackno << endl;
+
+        
+
+        //cout << "Flow " << _name << " flow_id " << flow_id() << " finished at " << timeAsUs(eventlist().now()) << " total bytes " << cum_ackno << endl;
         if (_end_trigger) {
             _end_trigger->activate();
         }
+
+        //printf("Completion Time Flow %s (%d) is %f - Start Time %f - Overall Time %f - Size %d\n", _name.c_str(), flow_id(), timeAsUs(eventlist().now() - _flow_start_time), timeAsUs(_flow_start_time), timeAsUs(eventlist().now()), _flow_size);
+
+
+        EventOver *flow_over = new EventOver(from, to, _flow_size, tag, eventlist().now(), AtlahsEventType::SEND_EVENT_OVER);
+        flow_over->node = lgs_node;
+        //printf("Setting1 elem %d %d - target%d offset%d proc%d nic%d\n", flow_over->node->host, flow_over->node->target, flow_over->node->target, flow_over->node->offset, flow_over->node->proc, flow_over->node->nic);
+
+        for (const Route* route : _paths) {
+            delete route;
+        }
+        _paths.clear();   
+
+        for (const Route* route : this->_sink->_paths) {
+            delete route;
+        }
+        this->_sink->_paths.clear();
+
+        if (_atlahs_api)
+            _atlahs_api->EventFinished(*flow_over);
+
         return;
     }
 
@@ -734,6 +768,7 @@ void NdpSrc::receivePacket(Packet& pkt)
         }
     case NDPACK:
         {
+            //printf("Received ACK at %f\n", timeAsUs(eventlist().now()));
             _acks_received++;
             _pull_window++;
             _first_window_count--;
@@ -753,15 +788,15 @@ int NdpSrc::choose_route() {
     {
         /* this case is basically SCATTER_PERMUTE, but avoiding bad paths. */
 
-        assert(_paths.size() > 0);
-        if (_paths.size() == 1) {
+        assert(simple_numb_paths > 0);
+        if (simple_numb_paths == 1) {
             // special case - no choice
             return 0;
         }
         // otherwise we've got a choice
         _crt_path++;
-        if (_crt_path == _paths.size()) {
-            permute_paths();
+        if (_crt_path == simple_numb_paths) {
+            //permute_paths();
             _crt_path = 0;
         }
         uint32_t path_id = _path_ids[_crt_path];
@@ -774,8 +809,8 @@ int NdpSrc::choose_route() {
             //re-choosing path
             cout << "re-choosing path " << path_id << endl;
             _crt_path++;
-            if (_crt_path == _paths.size()) {
-                permute_paths();
+            if (_crt_path == simple_numb_paths) {
+                //permute_paths();
                 _crt_path = 0;
             }
             path_id = _path_ids[_crt_path];
@@ -787,24 +822,24 @@ int NdpSrc::choose_route() {
     }
     case SCATTER_RANDOM:
         //ECMP
-        assert(_paths.size() > 0);
-        _crt_path = random()%_paths.size();
+        assert(simple_numb_paths > 0);
+        _crt_path = random()%simple_numb_paths;
         break;
     case SCATTER_PERMUTE:
     case SCATTER_ECMP:
         //Cycle through a permutation.  Generally gets better load balancing than SCATTER_RANDOM.
         _crt_path++;
-        assert(_paths.size() > 0);
-        if (_crt_path/_same_path_burst == _paths.size()) {
-            permute_paths();
+        assert(simple_numb_paths > 0);
+        if (_crt_path/_same_path_burst == simple_numb_paths) {
+            //permute_paths();
             _crt_path = 0;
         }
         break;
     case ECMP_FIB:
         //Cycle through a permutation.  Generally gets better load balancing than SCATTER_RANDOM.
         _crt_path++;
-        if (_crt_path == _paths.size()) {
-            permute_paths();
+        if (_crt_path == simple_numb_paths) {
+            //permute_paths();
             _crt_path = 0;
         }
         break;
@@ -813,8 +848,8 @@ int NdpSrc::choose_route() {
         //Cycle through a permutation, but use ECN to skip paths
         while(1) {
             _crt_path++;
-            if (_crt_path == _paths.size()) {
-                permute_paths();
+            if (_crt_path == simple_numb_paths) {
+                //permute_paths();
                 _crt_path = 0;
             }
             if (_path_ecns[_path_ids[_crt_path]] > 0) {
@@ -847,9 +882,9 @@ int NdpSrc::next_route() {
     // Just move on to the next path blindly
     assert(_route_strategy == REACTIVE_ECN);
     _crt_path++;
-    assert(_paths.size() > 0);
-    if (_crt_path == _paths.size()) {
-        permute_paths();
+    assert(simple_numb_paths > 0);
+    if (_crt_path == simple_numb_paths) {
+        //permute_paths();
         _crt_path = 0;
     }
     return _crt_path;
@@ -884,6 +919,7 @@ int NdpSrc::send_packet(NdpPull::seq_t pacer_no) {
         p->flow().logTraffic(*p,*this,TrafficLogger::PKT_SEND);
         p->set_ts(eventlist().now());
         p->set_pacerno(pacer_no);
+        p->from = from;
 
         switch (_route_strategy) {
         case SINGLE_PATH:
@@ -948,10 +984,10 @@ int NdpSrc::send_packet(NdpPull::seq_t pacer_no) {
         case PULL_BASED:
         case SCATTER_ECMP:
         {
-            assert(_paths.size() > 0);
+            assert(simple_numb_paths > 0);
             const Route *rt = _paths.at(choose_route());
             p = NdpPacket::newpkt(_flow, *rt, _highest_sent+1, pacer_no, _mss, false,
-                                  _paths.size()>0?_paths.size():1, last_packet,_dstaddr);
+                                  simple_numb_paths>0?simple_numb_paths:1, last_packet,_dstaddr);
             
 #ifdef DEBUG_PATH_STATS
             _path_counts_new[p->path_id()]++;
@@ -1087,16 +1123,16 @@ NdpSrc::retransmit_packet() {
         case PULL_BASED:
         case SCATTER_ECMP:
         {
-            assert(_paths.size() > 0);
+            assert(simple_numb_paths > 0);
             const Route* rt = _paths.at(_crt_path);
             p = NdpPacket::newpkt(_flow, *rt, seqno, 0, _mss, true,
-                                  _paths.size(), last_packet,_dstaddr);
+                                  simple_numb_paths, last_packet,_dstaddr);
             if (_route_strategy == SCATTER_RANDOM) {
-                _crt_path = random() % _paths.size();
+                _crt_path = random() % simple_numb_paths;
             } else {
                 _crt_path++;
-                if (_crt_path==_paths.size()){ 
-                    permute_paths();
+                if (_crt_path==simple_numb_paths){ 
+                    //permute_paths();
                     _crt_path = 0;
                 }
             }
@@ -1112,7 +1148,7 @@ NdpSrc::retransmit_packet() {
 
         case SINGLE_PATH:
             p = NdpPacket::newpkt(_flow, *_route, seqno, 0, _mss, true,
-                                  _paths.size(), last_packet,_dstaddr);
+                                  simple_numb_paths, last_packet,_dstaddr);
             break;
         case NOT_SET:
             abort();
@@ -1178,6 +1214,29 @@ void NdpSrc::log_rtt(simtime_picosec sent_time) {
 }
 
 void NdpSrc::doNextEvent() {
+
+    
+
+    if (false) {
+        EventOver *flow_over = new EventOver(from, to, _flow_size, tag, eventlist().now(), AtlahsEventType::SEND_EVENT_OVER);
+        flow_over->node = lgs_node;
+        //printf("Setting1 elem %d %d - target%d offset%d proc%d nic%d\n", flow_over->node->host, flow_over->node->target, flow_over->node->target, flow_over->node->offset, flow_over->node->proc, flow_over->node->nic);
+
+        for (const Route* route : _paths) {
+            delete route;
+        }
+        _paths.clear();   
+
+        for (const Route* route : this->_sink->_paths) {
+            delete route;
+        }
+        this->_sink->_paths.clear();
+
+        if (_atlahs_api)
+            _atlahs_api->EventFinished(*flow_over);
+        return;
+    }
+
     if (_rtx_timeout_pending) {
         _rtx_timeout_pending = false;
     
@@ -1186,6 +1245,7 @@ void NdpSrc::doNextEvent() {
         retransmit_packet();
     } else {
       //cout << "Starting flow" << endl;
+      _flow_start_time = eventlist().now();
       startflow();
     }
 }
@@ -1194,7 +1254,7 @@ void NdpSrc::print_stats() {
 #ifdef DEBUG_PATH_STATS
     cout << _nodename << "\n";
     int total_new = 0, total_rtx = 0, total_rto = 0;
-    for (uint32_t i = 0; i < _paths.size(); i++) {
+    for (uint32_t i = 0; i < simple_numb_paths; i++) {
         cout << _path_counts_new[i] << "/" << _path_counts_rtx[i] << "/" << _path_counts_rto[i] << " ";
         total_new += _path_counts_new[i];
         total_rtx += _path_counts_rtx[i];
@@ -1333,7 +1393,7 @@ void NdpSink::set_paths(vector<const Route*>* rt_list){
     case SCATTER_RANDOM:
     case PULL_BASED:
     case SCATTER_ECMP:
-        assert(_paths.size() == 0);
+        assert(simple_numb_paths == 0);
         _paths.resize(rt_list->size());
         _path_ids.resize(rt_list->size());
         for (unsigned int i=0;i<rt_list->size();i++){
@@ -1344,7 +1404,7 @@ void NdpSink::set_paths(vector<const Route*>* rt_list){
             _path_ids[i] = i;
         }
         _crt_path = 0;
-        permute_paths();
+        //permute_paths();
         break;
     case SINGLE_PATH:
     case ECMP_FIB:
@@ -1368,15 +1428,15 @@ void NdpSink::set_paths(uint32_t no_of_paths){
     case ECMP_FIB:
     case ECMP_FIB_ECN:
     case REACTIVE_ECN:
-        assert(_paths.size() == 0);
-        _paths.resize(no_of_paths);
+        assert(simple_numb_paths == 0);
+        //_paths.resize(no_of_paths);
         _path_ids.resize(no_of_paths);
         for (unsigned int i=0;i<no_of_paths;i++){
-            _paths[i]=NULL;
-                _path_ids[i] = i;
+            // /_paths[i]=NULL;
+            _path_ids[i] = i;
         }
         _crt_path = 0;
-        permute_paths();
+        //permute_paths();
         break;
     }
 }
@@ -1427,7 +1487,7 @@ void NdpSink::receiver_increase(NdpPacket* p){
         if (_route)
             pull_pkt = NdpPull::newpkt(p->flow(),*_route,_cumulative_ack,++_pull_no,_srcaddr);
         else 
-            pull_pkt = NdpPull::newpkt(p->flow(),*(_paths[random()%_paths.size()]),_cumulative_ack,++_pull_no,_srcaddr);
+            pull_pkt = NdpPull::newpkt(p->flow(),*(_paths[random()%simple_numb_paths]),_cumulative_ack,++_pull_no,_srcaddr);
     
         _pacer->enqueue_pull(pull_pkt, this);
         _parked_increase = _pacer->pacer_no();
@@ -1478,7 +1538,7 @@ void NdpSink::receivePacket(Packet& pkt) {
     simtime_picosec ts = p->ts();
     bool last_packet = ((NdpPacket*)&pkt)->last_packet();
 
-    update_path_history(*p);
+    //update_path_history(*p);
 
     if (pkt.header_only()){
         //is this trim last hop or is it from previous switches?
@@ -1613,11 +1673,11 @@ void NdpSink::process_request_to_send(NdpRTS* pkt){
             r = _route;
         } else {
             if (_route_strategy == SCATTER_RANDOM) {
-                _crt_path = random()%_paths.size();
+                _crt_path = random()%simple_numb_paths;
             } else {
                 _crt_path++;
-                if (_crt_path == _paths.size()) {
-                    permute_paths();
+                if (_crt_path == simple_numb_paths) {
+                    //permute_paths();
                     _crt_path = 0;
                 }
             }
@@ -1668,16 +1728,16 @@ void NdpSink::send_ack(simtime_picosec ts, NdpPacket::seq_t ackno,
     case SCATTER_RANDOM:
     case PULL_BASED:
     case SCATTER_ECMP:
-        assert(_paths.size() > 0);
+        assert(simple_numb_paths > 0);
         ack = NdpAck::newpkt(_src->_flow, *(_paths.at(_crt_path)), 0, ackno, 
                     _cumulative_ack, _pull_no, 
                     _path_history[_path_hist_index].path_id(), _srcaddr);
         if (_route_strategy == SCATTER_RANDOM) {
-            _crt_path = random()%_paths.size();
+            _crt_path = random()%simple_numb_paths;
         } else {
             _crt_path++;
-            if (_crt_path == _paths.size()) {
-            permute_paths();
+            if (_crt_path == simple_numb_paths) {
+            //permute_paths();
             _crt_path = 0;
             }
         }
@@ -1689,12 +1749,12 @@ void NdpSink::send_ack(simtime_picosec ts, NdpPacket::seq_t ackno,
     case REACTIVE_ECN:
         ack = NdpAck::newpkt(_src->_flow, *_route, 0, ackno, 
                     _cumulative_ack, _pull_no, 
-                    _path_history[_path_hist_index].path_id(), _srcaddr);
+                    0, _srcaddr);
 
         ack->set_pathid(_path_ids[_crt_path]);
         _crt_path++;
-        if (_crt_path == _paths.size()) {
-            permute_paths();
+        if (_crt_path == simple_numb_paths) {
+            //permute_paths();
             _crt_path = 0;
         }
         // set ECN echo only if that is selected strategy
@@ -1716,7 +1776,8 @@ void NdpSink::send_ack(simtime_picosec ts, NdpPacket::seq_t ackno,
     assert(ack);
     ack->flow().logTraffic(*ack,*this,TrafficLogger::PKT_CREATE);
     ack->set_ts(ts);
-
+    ack->from = this->from_sink;
+    ack->is_ack = true;
 
     if (enqueue_pull)
         _pacer->sendPacket(ack, pacer_no, this);
@@ -1738,16 +1799,16 @@ void NdpSink::send_nack(simtime_picosec ts, NdpPacket::seq_t ackno, NdpPacket::s
     case SCATTER_RANDOM:
     case PULL_BASED:
     case SCATTER_ECMP:
-        assert(_paths.size() > 0);
+        assert(simple_numb_paths > 0);
         nack = NdpNack::newpkt(_src->_flow, *(_paths.at(_crt_path)), 0, ackno, 
                     _cumulative_ack, _pull_no,
                     _path_history[_path_hist_index].path_id(),_srcaddr);
         if (_route_strategy == SCATTER_RANDOM) {
-            _crt_path = random()%_paths.size();
+            _crt_path = random()%simple_numb_paths;
         } else {
             _crt_path++;
-            if (_crt_path == _paths.size()) {
-                permute_paths();
+            if (_crt_path == simple_numb_paths) {
+                //permute_paths();
                 _crt_path = 0;
             }
         }
@@ -1757,12 +1818,12 @@ void NdpSink::send_nack(simtime_picosec ts, NdpPacket::seq_t ackno, NdpPacket::s
     case REACTIVE_ECN:
         nack = NdpNack::newpkt(_src->_flow, *_route, 0, ackno, 
                     _cumulative_ack, _pull_no, 
-                    _path_history[_path_hist_index].path_id(),_srcaddr);
+                    0,_srcaddr);
 
         nack->set_pathid(_path_ids[_crt_path]);
         _crt_path++;
-        if (_crt_path == _paths.size()) {
-            permute_paths();
+        if (_crt_path == simple_numb_paths) {
+            //permute_paths();
             _crt_path = 0;
         }
         // set ECN echo only if that is selected strategy
@@ -1790,7 +1851,7 @@ void NdpSink::send_nack(simtime_picosec ts, NdpPacket::seq_t ackno, NdpPacket::s
 
 
 void NdpSink::permute_paths() {
-    int len = _paths.size();
+    int len = simple_numb_paths;
     for (int i = 0; i < len; i++) {
         int ix = random() % (len - i);
         const Route* tmppath = _paths[ix];

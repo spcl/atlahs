@@ -1,0 +1,5 @@
+.vscode/
+sim/htsim-backend/sim/tests/*
+*.bin
+*.tmp
+idmap.txt

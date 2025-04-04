@@ -722,6 +722,7 @@ class SerializedGraph {
 				executableNodes.push_back(freed);
 			}
 		}
+		//printf("[%d-%d] Unlocked Number Nodes: %u\n", my_rank, offset, executableNodes.size());
 	}
 
 };
@@ -791,6 +792,7 @@ class Parser {
 			// THIS NEEDS MORE MEMORY - but it is also more convinient for interacrive use
 			// because it preserves the schedules
 			// Note that there is no fall-through to MAP_SHARED, we put the user in charge now!
+			printf("The schedule will be valid after this simulation!\n");
 		}
 		
 		if (mapping_start == MAP_FAILED) {
@@ -819,4 +821,3 @@ class Parser {
 	}
 	
 };
-

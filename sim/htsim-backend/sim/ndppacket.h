@@ -30,6 +30,8 @@ public:
                                     bool last_packet,
                                     uint32_t destination = UINT32_MAX) {
         NdpPacket* p = _packetdb.allocPacket();
+
+
         p->set_attrs(flow, size+ACKSIZE, seqno+size-1); // The NDP sequence number is the first byte of the packet; I will ID the packet by its last byte.
         p->_type = NDP;
         p->_is_header = false;
@@ -52,6 +54,7 @@ public:
                                     bool last_packet,
                                     uint32_t destination = UINT32_MAX) {
         NdpPacket* p = _packetdb.allocPacket();
+ 
         p->set_route(flow,route,size+ACKSIZE,seqno+size-1); // The NDP sequence number is the first byte of the packet; I will ID the packet by its last byte.
         p->_type = NDP;
         p->_is_header = false;

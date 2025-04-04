@@ -10,6 +10,8 @@
 #include "trigger.h"
 #include "eqdspacket.h"
 #include "circular_buffer.h"
+#include "datacenter/atlahs_event.h"
+#include "datacenter/atlahs_htsim_api.h"
 
 
 #define timeInf 0
@@ -77,10 +79,13 @@ class EqdsSrc : public EventSource, public PacketSink, public TriggerTarget {
         uint64_t pulls;
         uint64_t rts_nacks;
     };
+
     EqdsSrc(TrafficLogger *trafficLogger, EventList &eventList, EqdsNIC &nic, bool rts = false);
     void logFlowEvents(FlowEventLogger& flow_logger) {_flow_logger = &flow_logger;}
     virtual void connect(Route &routeout, Route &routeback, EqdsSink &sink, simtime_picosec start);
     void timeToSend();
+    graph_node_properties *lgs_node; // used for logging purposes
+
     void receivePacket(Packet &pkt) ;
     void doNextEvent();
     void setDst(uint32_t dst) {_dstaddr = dst;}
@@ -90,6 +95,8 @@ class EqdsSrc : public EventSource, public PacketSink, public TriggerTarget {
         _cwnd = cwnd;
     }
     mem_b maxWnd() const {return _maxwnd;}
+
+    uint64_t _flow_start_time;
 
     const Stats &stats() const { return _stats; }
 
@@ -122,6 +129,8 @@ class EqdsSrc : public EventSource, public PacketSink, public TriggerTarget {
     static bool _debug;
     bool _debug_src;
     bool debug() const {return _debug_src;}
+
+    AtlahsHtsimApi *_atlahs_api = nullptr;
    
  private:
     EqdsNIC& _nic;
@@ -177,7 +186,7 @@ class EqdsSrc : public EventSource, public PacketSink, public TriggerTarget {
     void processAck(const EqdsAckPacket& pkt);
     void processNack(const EqdsNackPacket& pkt);
     void processPull(const EqdsPullPacket& pkt);
-    bool checkFinished(EqdsDataPacket::seq_t cum_ack);
+    bool checkFinished(EqdsDataPacket::seq_t cum_ack, const EqdsAckPacket& pkt);
     inline void penalizePath(uint16_t path_id, uint8_t penalty);
     Stats _stats;
     EqdsSink* _sink;

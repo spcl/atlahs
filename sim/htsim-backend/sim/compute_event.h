@@ -8,8 +8,6 @@
  */
 #include "config.h"
 #include "eventlist.h"
-//#include "fairpullqueue.h"
-//#include "datacenter/logsim-interface.h"
 #include "network.h"
 #include "trigger.h"
 #include "eqdspacket.h"
@@ -30,13 +28,7 @@ class ComputeEvent : public EventSource {
 
     void setCompute(simtime_picosec computation_time);
     void startComputations();
-
-    // void receivePacket(Packet &pkt) override;
-    // const string &nodename() override;
-
-    // virtual void activate() { startflow(); }
-    // void set_end_trigger(Trigger &trigger);
-
+    
     std::function<void(int)> f_compute_over_hook;
 
   private:

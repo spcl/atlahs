@@ -3,15 +3,15 @@ Tiers 2
 Podsize 32
 
 Tier 0
-Downlink_speed_Gbps 100
+Downlink_speed_Gbps 8000
 Radix_Down 8
-Radix_Up 2
-Downlink_Latency_ns 1000
+Radix_Up 8
+Downlink_Latency_ns 1
 Switch_Latency_ns 0
-Oversubscribed 4
+Oversubscribed 1
 
 Tier 1
-Downlink_speed_Gbps 100
+Downlink_speed_Gbps 8000
 Radix_Down 4
-Downlink_Latency_ns 1000
+Downlink_Latency_ns 1
 Switch_Latency_ns 0

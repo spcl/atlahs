@@ -686,6 +686,29 @@ class SerializedGraph {
 			}
 		}
 	}
+
+
+	void MarkNodeAsDone(uint32_t offset) {
+
+        DeserializedNode N = get_node_by_offset(offset);
+
+        /* if (N.Type == OP_LOCOP_IN_PROGRESS || N.Type == OP_LOCOP) {
+            printf("Size depending on me %d - Rank %d Offset %d\n",
+                   N.DependOnMe.size(), my_rank, offset);
+        } */
+        for (uint32_t cnt = 0; cnt < N.DependOnMe.size(); cnt++) {
+            uint32_t offset = N.DependOnMe[cnt];
+
+            int SIZEOF_NODE_INFO = sizeof(char) + sizeof(uint64_t) + sizeof(uint32_t) * 7 + sizeof(uint8_t) * 2;
+            uint32_t *dep_cnt = (uint32_t *)(mapping_start + sizeof(uint32_t) * 2 + sizeof(uint32_t) * num_root_nodes +
+                                             SIZEOF_NODE_INFO * offset);
+            (*dep_cnt)--;
+            //printf("Node %u has %u dependencies - WRONG!\n", offset, *dep_cnt);	
+            if ((*dep_cnt) == 0) {
+                executableNodes.push_back(get_node_by_offset(offset));
+            }
+        }
+    }
 	
 	/**
 	 * Mark a node as done. This means that all nodes that depend on this node which
@@ -694,13 +717,14 @@ class SerializedGraph {
 	 * @param cpu_time The timestamp of the CPU that executed the node specified
 	 * by the offset
 	 */
-	void MarkNodeAsDone(uint32_t offset, uint64_t cpu_time = 0)
+	void MarkNodeAsDone(uint32_t offset, uint64_t cpu_time)
 	{
 		DeserializedNode N = get_node_by_offset(offset);
-		// std::cout << "[INFO] " << "Host: " << my_rank << ", Node " << offset << " has " << N.DependOnMe.size() << " dependencies" << std::endl;
+		//std::cout << "[INFO] " << "Host: " << my_rank << ", Node " << offset << " has " << N.DependOnMe.size() << " dependencies" << std::endl;
+		//printf("Executable1 Nodes: %u\n", executableNodes.size());
 		for (uint32_t cnt=0; cnt<N.DependOnMe.size(); cnt++) {
 			uint32_t offset = N.DependOnMe[cnt];
-			
+			//printf("Node %u has %u dependencies\n", offset, N.DependOnMe.size());
 			int SIZEOF_NODE_INFO = sizeof(char) + sizeof(uint64_t) + sizeof(uint32_t)*7 + sizeof(uint8_t)*2;
 			uint32_t* dep_cnt = (uint32_t*) (mapping_start + sizeof(uint32_t)*2 + sizeof(uint32_t)*num_root_nodes + SIZEOF_NODE_INFO*offset);
 			(*dep_cnt)--;
@@ -713,6 +737,8 @@ class SerializedGraph {
 			{
 				node_start_time[offset] = std::max(node_start_time[offset], cpu_time);
 			}			
+			//printf("Node %u has %u dependencies\n", offset, *dep_cnt);	
+			//printf("Node %u has %u dependencies\n", offset, *dep_cnt);
 			if ((*dep_cnt) == 0) 
 			{
 				DeserializedNode freed = get_node_by_offset(offset);
@@ -722,6 +748,7 @@ class SerializedGraph {
 				executableNodes.push_back(freed);
 			}
 		}
+		//printf("[%d-%d] Unlocked Number Nodes: %u\n", my_rank, offset, executableNodes.size());
 	}
 
 };
@@ -782,7 +809,7 @@ class Parser {
 			// the mapped region - so we fall back to map_shared. This destroys the schedule, so we invalidate
 			// the magic cookie if we do this
 			mapping_start = (char*) mmap(NULL, mapping_length, PROT_READ | PROT_WRITE, MAP_SHARED, fileno(schedules_fd), 0); 
-			*((uint64_t*) mapping_start) = MAGIC_COOKIE_INVALID;
+			//*((uint64_t*) mapping_start) = MAGIC_COOKIE_INVALID;
 			printf("The schedule will be invalid after this simulation!\n");
 		}
 		

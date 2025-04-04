@@ -20,7 +20,10 @@ class Noise {
 
   Noise(gengetopt_args_info *args_info, int p) : p(p) {
 
+    //std::cout << "read noise trace file: " << args_info->noise_trace_arg << "\n";
+
     if(args_info->noise_trace_given) {
+
       const int size=1024;
       char buffer[size];
       std::ifstream trace;

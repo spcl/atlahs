@@ -9,7 +9,7 @@ CompositeQueue::CompositeQueue(linkspeed_bps bitrate, mem_b maxsize, EventList& 
                                QueueLogger* logger)
     : Queue(bitrate, maxsize, eventlist, logger)
 {
-    _ratio_high = 100000;
+    _ratio_high = 10000;
     _ratio_low = 1;
     _crt = 0;
     _num_headers = 0;
@@ -29,6 +29,7 @@ CompositeQueue::CompositeQueue(linkspeed_bps bitrate, mem_b maxsize, EventList& 
     _serv = QUEUE_INVALID;
     stringstream ss;
     ss << "compqueue(" << bitrate/1000000 << "Mb/s," << maxsize << "bytes)";
+    //cout << "compqueue(" << bitrate/1000000 << "Mb/s," << maxsize << "bytes)";
     _nodename = ss.str();
 }
 
@@ -138,6 +139,10 @@ CompositeQueue::receivePacket(Packet& pkt)
     pkt.flow().logTraffic(pkt,*this,TrafficLogger::PKT_ARRIVE);
     if (_logger) _logger->logQueue(*this, QueueLogger::PKT_ARRIVE, pkt);
 
+    /* if (_queuesize_low > 4096 * 16) {
+        printf(" queue name %s size %d -- From %d %d - Size %d - Is Ack %d\n", _nodename.c_str(), _queuesize_low, pkt.from, pkt.flow_id(), pkt.size(), pkt.is_ack);
+    } */
+
     if (!pkt.header_only()){
         if (_queuesize_low+pkt.size() <= _maxsize  || drand()<0.5) {
             //regular packet; don't drop the arriving packet
@@ -165,7 +170,7 @@ CompositeQueue::receivePacket(Packet& pkt)
                 booted_pkt->flow().logTraffic(*booted_pkt,*this,TrafficLogger::PKT_TRIM);
                 if (_logger) _logger->logQueue(*this, QueueLogger::PKT_TRIM, pkt);
                         
-                if (_queuesize_high+booted_pkt->size() > 2*_maxsize){
+                if (_queuesize_high+booted_pkt->size() > 20000*_maxsize){
                     if (_return_to_sender && booted_pkt->reverse_route()  && booted_pkt->bounced() == false) {
                         //return the packet to the sender
                         if (_logger) _logger->logQueue(*this, QueueLogger::PKT_BOUNCE, *booted_pkt);
@@ -222,7 +227,7 @@ CompositeQueue::receivePacket(Packet& pkt)
     }
     assert(pkt.header_only());
     
-    if (_queuesize_high+pkt.size() > 2*_maxsize){
+    if (_queuesize_high+pkt.size() > 200000*_maxsize){
         //drop header
         //cout << "drop!\n";
         if (_return_to_sender && pkt.reverse_route()  && pkt.bounced() == false) {

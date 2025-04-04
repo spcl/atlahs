@@ -11,6 +11,7 @@
 #include "logfile.h"
 #include "eqds_logger.h"
 #include "clock.h"
+#include "logsim-interface.h"
 #include "eqds.h"
 #include "compositequeue.h"
 #include "topology.h"
@@ -71,7 +72,7 @@ int main(int argc, char **argv) {
     bool oversubscribed_congestion_control = false;
 
     filename << "logout.dat";
-    int end_time = 1000;//in microseconds
+    int end_time = 1000000;//in microseconds
 
     //unsure how to set this. 
     queue_type snd_type = FAIR_PRIO;
@@ -81,6 +82,7 @@ int main(int argc, char **argv) {
 
     char* tm_file = NULL;
     char* topo_file = NULL;
+    string goal_filename = "";
 
     while (i<argc) {
         if (!strcmp(argv[i],"-o")) {
@@ -205,7 +207,10 @@ int main(int argc, char **argv) {
             seed = atoi(argv[i+1]);
             cout << "random seed "<< seed << endl;
             i++;
-        } else if (!strcmp(argv[i],"-mtu")){
+        } else if (!strcmp(argv[i], "-goal")) {
+            goal_filename = argv[i + 1];
+            i++;
+        } else if (!strcmp(argv[i],"-mtu")) {
             packet_size = atoi(argv[i+1]);
             i++;
         } else if (!strcmp(argv[i],"-paths")){
@@ -419,6 +424,7 @@ int main(int argc, char **argv) {
     }
 
     ConnectionMatrix* conns = new ConnectionMatrix(no_of_nodes);
+    LogSimInterface *lgs = NULL;
 
     if (tm_file){
         cout << "Loading connection matrix from  " << tm_file << endl;
@@ -429,8 +435,8 @@ int main(int argc, char **argv) {
         }
     }
     else {
-        cout << "Loading connection matrix from  standard input" << endl;        
-        conns->load(cin);
+/*         cout << "Loading connection matrix from  standard input" << endl;        
+        conns->load(cin); */
     }
 
     if (conns->N != no_of_nodes && no_of_nodes != 0){
@@ -447,7 +453,7 @@ int main(int argc, char **argv) {
         if (top->no_of_nodes() != no_of_nodes) {
             cerr << "Mismatch between connection matrix (" << no_of_nodes << " nodes) and topology ("
                  << top->no_of_nodes() << " nodes)" << endl;
-            exit(1);
+            //exit(1);
         }
     } else {
         FatTreeTopology::set_tiers(tiers);
@@ -485,15 +491,50 @@ int main(int argc, char **argv) {
 
     map <flowid_t, TriggerTarget*> flowmap;
 
+    printf("No of nodes wih connections %d\n", no_of_nodes);
+    printf("No of nodes topology %d\n", top->no_of_nodes());
+
+    if (goal_filename.size() > 0) {
+        AtlahsHtsimApi *api = new AtlahsHtsimApi();
+        api->setTopology(top);
+        api->setEventList(&eventlist);
+        api->setComputeEvent(new ComputeEvent(eventlist));
+        api->setNullEvent(new NullEvent(eventlist));
+        lgs = new LogSimInterface(NULL, traffic_logger, eventlist, top, nullptr);
+        lgs->htsim_api = api;
+        api->setLogSimInterface(lgs);
+        lgs->set_protocol(EQDS_PROTOCOL);
+        lgs->htsim_api->linkspeed = linkspeed;
+
+        double linkSpeedBytesPerSec = (linkspeed/1000000000 * 1e9) / 8.0;
+
+        // Calculate G in cycles
+        lgs->htsim_api->htsim_G  = 1e9 / linkSpeedBytesPerSec;
+
+        printf("<HTSIM> G %f\n", lgs->htsim_api->htsim_G);
+
+        lgs->htsim_api->total_nodes = no_of_nodes;
+        lgs->htsim_api->Setup();
+        printf("Started LGS\n");
+        
+        start_lgs(goal_filename, *lgs);
+        printf("Finished all\n");
+        fflush(stdout);
+        return 0;
+    } else {
+
+    }
+
     for (size_t c = 0; c < all_conns->size(); c++){
         connection* crt = all_conns->at(c);
         int src = crt->src;
         int dest = crt->dst;
         //cout << "Connection " << crt->src << "->" <<crt->dst << " starting at " << crt->start << " size " << crt->size << endl;
 
-        eqds_src = new EqdsSrc(traffic_logger, eventlist, *nics.at(src));
-        eqds_src->setCwnd(cwnd*Packet::data_packet_size());
-        eqds_srcs.push_back(eqds_src);
+        eqds_src = new EqdsSrc(NULL, eventlist, *nics.at(src));
+        //printf("CWND IS %d\n", cwnd*Packet::data_packet_size());
+        //eqds_src->setCwnd(cwnd*Packet::data_packet_size());
+        //eqds_srcs.push_back(eqds_src);
         eqds_src->setDst(dest);
 
         if (log_flow_events) {
