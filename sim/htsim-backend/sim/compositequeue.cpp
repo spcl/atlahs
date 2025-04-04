@@ -66,6 +66,10 @@ void CompositeQueue::beginService(){
 
 bool CompositeQueue::decide_ECN() {
     //ECN mark on deque
+
+    _ecn_maxthresh = _maxsize * 0.8; // 80% of maxsize
+    _ecn_minthresh = _maxsize * 0.2; // 80% of maxsize
+
     if (_queuesize_low > _ecn_maxthresh) {
         return true;
     } else if (_queuesize_low > _ecn_minthresh) {

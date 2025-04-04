@@ -539,7 +539,6 @@ void UecSrc::adjust_window(simtime_picosec ts, bool ecn, simtime_picosec rtt) {
     } else {
         _cwnd += 1.0/_cwnd;
     }
-
     check_limits_cwnd();
 }
 
@@ -1017,7 +1016,7 @@ void UecSink::connect(UecSrc &src, const Route *route) {
 }
 
 void UecSink::set_paths(uint32_t no_of_paths) {
-    //simple_numb_paths = no_of_paths;
+    simple_numb_paths = no_of_paths;
     switch (_route_strategy) {
     case SCATTER_PERMUTE:
 
@@ -1031,7 +1030,6 @@ void UecSink::set_paths(uint32_t no_of_paths) {
     case ECMP_FIB_ECN:
     case ECMP_RANDOM2_ECN:
     case REACTIVE_ECN:
-        assert(simple_numb_paths == 0);
         _paths.resize(no_of_paths);
         _path_ids.resize(no_of_paths);
         for (unsigned int i = 0; i < no_of_paths; i++) {
