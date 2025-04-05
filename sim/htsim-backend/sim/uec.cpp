@@ -584,7 +584,8 @@ void UecSrc::adjust_window(simtime_picosec ts, bool ecn, simtime_picosec rtt) {
         if (ecn) {
             _cwnd -= _mss * 0.5;
         } else {
-            _cwnd += 1.0/_cwnd;
+            printf("Increased by %f\n", (_mss * _mss / _cwnd));
+            _cwnd += _mss * _mss / _cwnd;
         }
     } else if (algorithm_type == "min_cc") {
         _cwnd = 1 * _mss;
@@ -597,18 +598,19 @@ void UecSrc::adjust_window(simtime_picosec ts, bool ecn, simtime_picosec rtt) {
         if (rtt < target_rtt) {
             // Additive increase:
             if (_cwnd >= _mss) {
-                _cwnd += ((_mss * 2.0) / _cwnd) * _mss;
+                _cwnd += ((_mss * 0.5) / _cwnd) * _mss;
             } else {
                 std::cerr << "Window below 1 MSS. Not supported.\n";
                 std::abort();
             }
         } else if (can_decrease) {
             // Multiplicative decrease:
-            _cwnd *= std::max(1 - 1 * (rtt - (double)target_rtt) / rtt, 1 - 0.25);
+            _cwnd *= std::max(1 - 1 * (rtt - (double)target_rtt) / rtt, 1 - 0.5);
             last_decrease = eventlist().now();
         }
-        //printf("Flow %s  - CWND %lu\n", _name.c_str(), _cwnd);
     }
+    //printf("Flow %s  - CWND %lu - ECN %d\n", _name.c_str(), _cwnd, ecn);
+
     
     check_limits_cwnd();
 }
