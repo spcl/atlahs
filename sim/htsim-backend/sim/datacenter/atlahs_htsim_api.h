@@ -8,7 +8,6 @@
 #include "../null_event.h"
 #include "atlahs_event.h"
 
-
 // Forward declarations
 class EventList;
 class UecRtxTimerScanner;
@@ -19,6 +18,29 @@ class EqdsPullPacer;
 class EqdsNIC;
 class NdpPullPacer;
 //class ComputeEvent;
+
+// Added FlowInfo class
+class FlowInfo {
+public:
+    // Default constructor
+    FlowInfo() 
+        : flowStartTime(0), flowEndTime(0), completionTime(0), flowSize(0), numNacks(0), finalCwnd(0) 
+    {}
+
+    // Parameterized constructor
+    FlowInfo(simtime_picosec start, simtime_picosec end, simtime_picosec completion,
+                uint64_t size, uint64_t nacks, uint64_t cwnd)
+        : flowStartTime(start), flowEndTime(end), completionTime(completion),
+            flowSize(size), numNacks(nacks), finalCwnd(cwnd)
+    {}
+
+    simtime_picosec flowStartTime;
+    simtime_picosec flowEndTime;
+    simtime_picosec completionTime;
+    uint64_t flowSize;
+    uint64_t numNacks;
+    uint64_t finalCwnd;
+};
 
 class AtlahsHtsimApi : public AtlahsApi {
 public:
@@ -101,9 +123,12 @@ public:
     }
 
     linkspeed_bps linkspeed; // TO DO
+    int linkspeed_gbps = 100; // TO DO
     double htsim_G; // TO DO
     int total_nodes; // TO DO
     bool send_done_return_control = false; // TO DO
+    std::vector<FlowInfo> flowInfos;
+    bool print_stats_flows = false;
     
 private:
     EventList* _eventlist = nullptr;

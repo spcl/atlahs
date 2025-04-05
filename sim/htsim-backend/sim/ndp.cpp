@@ -693,8 +693,10 @@ void NdpSrc::processAck(const NdpAck& ack) {
         }
         this->_sink->_paths.clear();
 
-        if (_atlahs_api)
+        if (_atlahs_api) {
+            _atlahs_api->flowInfos.push_back(FlowInfo(timeAsUs(_flow_start_time), timeAsUs(eventlist().now()), timeAsUs(eventlist().now() - _flow_start_time), _flow_size, _nacks_received, _cwnd));
             _atlahs_api->EventFinished(*flow_over);
+        }
 
         return;
     }
@@ -1031,6 +1033,8 @@ int NdpSrc::send_packet(NdpPull::seq_t pacer_no) {
         _highest_sent += _mss;  //XX beware wrapping
         _packets_sent++;
         _new_packets_sent++;
+        //printf("Flow %s - Send %lu\n", _name.c_str(), eventlist().now() / 1000);
+
 
         PacketSink* sink = p->sendOn();
         packets_sent++; 
@@ -1232,8 +1236,13 @@ void NdpSrc::doNextEvent() {
         }
         this->_sink->_paths.clear();
 
-        if (_atlahs_api)
+        if (_atlahs_api) {
+            if (_atlahs_api->print_stats_flows) {
+                _atlahs_api->flowInfos.push_back(FlowInfo(timeAsUs(_flow_start_time), timeAsUs(eventlist().now()), timeAsUs(eventlist().now() - _flow_start_time), _flow_size, _nacks_received, _cwnd));
+            }
             _atlahs_api->EventFinished(*flow_over);
+        }
+            
         return;
     }
 

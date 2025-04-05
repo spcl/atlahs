@@ -14,6 +14,7 @@ class UecPacket : public Packet {
   public:
     typedef uint64_t seq_t;
     packet_direction _trim_direction;
+    simtime_picosec timestamp_sent;
 
     UecPacket() : Packet(){};
 
@@ -143,6 +144,7 @@ class UecAck : public Packet {
     //  inline void set_ts(simtime_picosec ts) {_ts = ts;}
     virtual PktPriority priority() const {return Packet::PRIO_HI;}
 
+    simtime_picosec timestamp_sent;
     virtual ~UecAck() {}
     const static int acksize = 64;
     const Route *inRoute;

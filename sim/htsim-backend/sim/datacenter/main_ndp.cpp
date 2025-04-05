@@ -100,6 +100,7 @@ int main(int argc, char **argv) {
     int seed = 13;
     int path_burst = 1;
     int i = 1;
+    bool collect_flow_info = false;
 
     bool oversubscribed_congestion_control = false;
 
@@ -137,6 +138,9 @@ int main(int argc, char **argv) {
         } else if (!strcmp(argv[i],"-rts")) {
             rts = true;
             cout << "rts enabled "<< endl;
+        } else if (!strcmp(argv[i], "-lgs_flow_stats")) {
+            collect_flow_info = true;
+            printf("Flow collection: %d\n", true);
         } else if (!strcmp(argv[i],"-nodes")) {
             no_of_nodes = atoi(argv[i+1]);
             cout << "no_of_nodes "<<no_of_nodes << endl;
@@ -394,8 +398,8 @@ int main(int argc, char **argv) {
         
     }
 
-    eventlist.setEndtime(timeFromSec(10));
-    queuesize = memFromPkt(queuesize);
+    eventlist.setEndtime(timeFromSec(50));
+    queuesize = (queuesize);
     
     switch (route_strategy) {
     case ECMP_FIB_ECN:
@@ -563,6 +567,8 @@ int main(int argc, char **argv) {
         lgs->set_protocol(NDP_PROTOCOL);
         lgs->htsim_api->linkspeed = linkspeed;
         lgs->percentage_lgs = percentage_lgs;
+        lgs->print_stats_flows = collect_flow_info;
+        lgs->htsim_api->print_stats_flows = collect_flow_info;
 
         double linkSpeedBytesPerSec = (linkspeed/1000000000 * 1e9) / 8.0;
 

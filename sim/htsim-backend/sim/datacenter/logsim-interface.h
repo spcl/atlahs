@@ -108,6 +108,7 @@ class LogSimInterface {
     int lgs_L = 0;
     double lgs_G = 0.04;
     uint32_t lgs_S = 0;
+    bool print_stats_flows = false;
 
   private:
     bool debug_prints = false;

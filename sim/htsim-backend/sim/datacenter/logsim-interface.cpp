@@ -192,6 +192,19 @@ void LogSimInterface::null_over(int i) {
 void LogSimInterface::reset_latest_receive() { _latest_recv->updated = false; }
 
 void LogSimInterface::terminate_sim() {
+  uint64_t tot_nacks = 0;
+  if (print_stats_flows) {
+    printf("Flow Info Size is %lu\n", htsim_api->flowInfos.size());
+    for (int i = 0; i < htsim_api->flowInfos.size(); i++) {
+      printf("F %d - ST %lu - ET %lu - OT %lu - S %lu - N %lu - C %lu\n",
+             i, htsim_api->flowInfos[i].flowStartTime, htsim_api->flowInfos[i].flowEndTime,
+             htsim_api->flowInfos[i].completionTime, htsim_api->flowInfos[i].flowSize,
+             htsim_api->flowInfos[i].numNacks, htsim_api->flowInfos[i].finalCwnd);
+      tot_nacks += htsim_api->flowInfos[i].numNacks;
+
+    }
+    printf("\nTotal Number of NACKS %lu\n", tot_nacks);
+  }
 }
 
 void LogSimInterface::htsim_simulate_until(int64_t until) {
@@ -956,6 +969,7 @@ int start_lgs(std::string filename_goal, LogSimInterface &lgs) {
           printf("progress: %u %% (%llu) ", lastperc, (unsigned long long)aqtime);
           lastperc++;
           if (lastperc == lgs_interface->percentage_lgs && lgs_interface->percentage_lgs > 0) {
+            lgs_interface->terminate_sim();
             exit(0);
           }
           uint maxrq=0, maxuq=0;
@@ -974,7 +988,6 @@ int start_lgs(std::string filename_goal, LogSimInterface &lgs) {
       unsigned long int diff = tend.tv_sec - tstart.tv_sec;
 
     printf("It terminates! Htsim time %lu\n", lgs_interface->htsim_api->getGlobalTimeNs());
-    printf("Total Number of NACKS %lu\n", lgs_interface->htsim_api->getNumberNacks());
     fflush(stdout);
     
   #ifndef STRICT_ORDER
@@ -1185,6 +1198,7 @@ int start_lgs(std::string filename_goal, LogSimInterface &lgs) {
       }
     }
   printf("LGS terminates!\n");
+  lgs_interface->terminate_sim();
   fflush(stdout);
   return 0;
 }

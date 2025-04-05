@@ -4,8 +4,7 @@
 #include "fat_tree_topology.h"
 #include "logsim-interface.h"
 #include "../lgs/LogGOPSim.hpp"
-
-
+    
 
 void AtlahsHtsimApi::Send(const SendEvent &event, graph_node_properties elem) {
     //std::cout << "AtlahsHtsimApi: Sending event" << std::endl;
@@ -166,15 +165,14 @@ void AtlahsHtsimApi::Send(const SendEvent &event, graph_node_properties elem) {
 }
 
 void AtlahsHtsimApi::Recv(const RecvEvent &event) {
-    //std::cout << "AtlahsHtsimApi: Receiving event" << std::endl;
+    // No Op for HTSIM
 }
 
 void AtlahsHtsimApi::Calc(const ComputeAtlahsEvent &event) {
-    //std::cout << "AtlahsHtsimApi: Performing calculation on event" << std::endl;
+    // Done Directly in lgs_interface for now
 }
 
 void AtlahsHtsimApi::Setup() {
-    std::cout << "AtlahsHtsimApi: Setting up simulator. Currently Dummy in this version." << std::endl;
     printf("No of nodes %d\n", total_nodes);
 
     if (_logsim_interface->get_protocol() == EQDS_PROTOCOL) {
@@ -201,5 +199,4 @@ void AtlahsHtsimApi::EventFinished(const EventOver &event) {
     } else {
         abort();
     }
-    
 }

@@ -281,6 +281,7 @@ class UecSrc : public PacketSink, public EventSource, public TriggerTarget {
     static int target_rtt_percentage_over_base;
     static int ratio_os_stage_1;
     static int once_per_rtt;
+    simtime_picosec target_rtt;
     static double kmax_double;
     static double kmin_double;
     double phantom_size_calc = 0;

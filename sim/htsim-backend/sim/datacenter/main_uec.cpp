@@ -106,6 +106,7 @@ int main(int argc, char **argv) {
     double x_gain = 0.15;
     double z_gain = 1;
     double w_gain = 1;
+    bool collect_flow_info = false;
     double bonus_drop = 1;
     double drop_value_buffer = 1;
     double starting_cwnd_ratio = 0;
@@ -260,7 +261,9 @@ int main(int argc, char **argv) {
         } else if (!strcmp(argv[i], "-stop_after_quick")) {
             UecSrc::set_stop_after_quick(true);
             printf("StopAfterQuick: %d\n", true);
-
+        } else if (!strcmp(argv[i], "-lgs_flow_stats")) {
+            collect_flow_info = true;
+            printf("Flow collection: %d\n", true);
         } else if (!strcmp(argv[i], "-paths")) {
             number_entropies = atoi(argv[i + 1]);
             i++;
@@ -541,14 +544,14 @@ int main(int argc, char **argv) {
             } else if (!strcmp(argv[i + 1], "mprdma")) {
                 UecSrc::set_alogirthm("mprdma");
                 printf("Name Running: SMaRTT Per RTT\n");
-            } else if (!strcmp(argv[i + 1], "delayC")) {
-                UecSrc::set_alogirthm("delayC");
-            } else if (!strcmp(argv[i + 1], "delayD")) {
-                UecSrc::set_alogirthm("delayD");
+            } else if (!strcmp(argv[i + 1], "min_cc")) {
+                UecSrc::set_alogirthm("min_cc");
+            } else if (!strcmp(argv[i + 1], "no_cc")) {
+                UecSrc::set_alogirthm("no_cc");
                 printf("Name Running: STrack\n");
-            } else if (!strcmp(argv[i + 1], "standard_trimming")) {
-                UecSrc::set_alogirthm("standard_trimming");
-                printf("Name Running: UEC Version D\n");
+            } else if (!strcmp(argv[i + 1], "swift_like")) {
+                UecSrc::set_alogirthm("swift_like");
+                printf("Name Running: swift_like\n");
             } else if (!strcmp(argv[i + 1], "rtt")) {
                 UecSrc::set_alogirthm("rtt");
                 printf("Name Running: SMaRTT RTT Only\n");
@@ -905,12 +908,15 @@ int main(int argc, char **argv) {
         lgs->set_protocol(SENDER_PROTOCOL);
         lgs->htsim_api->linkspeed = linkspeed;
         lgs->percentage_lgs = percentage_lgs;
+        lgs->print_stats_flows = collect_flow_info;
+        lgs->htsim_api->print_stats_flows = collect_flow_info;
         
 
         double linkSpeedBytesPerSec = (linkspeed/1000000000 * 1e9) / 8.0;
 
         // Calculate LGS parameters
         lgs->htsim_api->htsim_G  = 1e9 / linkSpeedBytesPerSec;
+        lgs->htsim_api->linkspeed_gbps = linkspeed_gbps;
         lgs->lgs_O = lgs_O;
         lgs->lgs_o = lgs_o;
         lgs->lgs_g = lgs_g;

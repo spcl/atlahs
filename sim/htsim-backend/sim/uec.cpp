@@ -79,6 +79,8 @@ UecSrc::UecSrc(UecLogger *logger, TrafficLogger *pktLogger, EventList &eventList
 
     _base_rtt = rtt;
 
+    target_rtt = _base_rtt * 1.5;
+
     if (precision_ts != 1) {
         _base_rtt = (((_base_rtt + precision_ts - 1) / precision_ts) * precision_ts);
     }
@@ -115,8 +117,10 @@ UecSrc::UecSrc(UecLogger *logger, TrafficLogger *pktLogger, EventList &eventList
 
     // internal_stop_pacing_rtt = 0;
 
-    _maxcwnd = starting_cwnd * 1;
-    _cwnd = starting_cwnd;
+    //printf("BDP and RTT: %lu %lu\n", _bdp, _base_rtt);
+
+    _maxcwnd = _bdp * 1;
+    _cwnd = _bdp;
     _consecutive_low_rtt = 0;
     target_window = _cwnd;
     _target_based_received = true;
@@ -125,6 +129,16 @@ UecSrc::UecSrc(UecLogger *logger, TrafficLogger *pktLogger, EventList &eventList
     _enableDistanceBasedRtx = false;
     f_flow_over_hook = nullptr;
     last_pac_change = 0;
+
+
+    if (algorithm_type == "mprdma") {
+    } else if (algorithm_type == "min_cc") {
+        _cwnd = 1 * _mss;
+    } else if (algorithm_type == "no_cc") {
+        _cwnd = _bdp;
+    } else if (algorithm_type == "swift_like") {
+        _cwnd = _cwnd;
+    }
 }
 
 
@@ -259,9 +273,21 @@ void UecSrc::check_limits_cwnd() {
 
 
 void UecSrc::processNack(UecNack &pkt) {  
-    check_limits_cwnd();
 
     _nacks_received++;
+
+    if (algorithm_type == "mprdma") {
+            _cwnd -= _mss * 1;
+    } else if (algorithm_type == "min_cc") {
+        _cwnd = 1 * _mss;
+    } else if (algorithm_type == "no_cc") {
+        _cwnd = _bdp;
+    } else if (algorithm_type == "swift_like") {
+        _cwnd = _cwnd / 2;
+    }
+    
+    check_limits_cwnd();
+
 
     // mark corresponding packet for retransmission
     auto i = get_sent_packet_idx(pkt.seqno());
@@ -394,6 +420,7 @@ int UecSrc::next_route() {
 
 void UecSrc::processAck(UecAck &pkt, bool force_marked) {
     UecAck::seq_t seqno = pkt.ackno();
+    simtime_picosec ts = pkt.timestamp_sent;
 
     consecutive_nack = 0;
     bool marked = pkt.flags() & ECN_ECHO; // ECN was marked on data packet and echoed on ACK
@@ -405,6 +432,23 @@ void UecSrc::processAck(UecAck &pkt, bool force_marked) {
     } else {
         now_time = (((eventlist().now() + precision_ts - 1) / precision_ts) * precision_ts);
     }
+
+    uint64_t rtt = now_time - ts;
+    rtt = rtt / 1000;
+
+    if (rtt < _base_rtt) {
+        _base_rtt = rtt;
+        target_rtt = _base_rtt * 1.5;
+        if (_atlahs_api != nullptr) {
+            _bdp = (_base_rtt) * _atlahs_api->linkspeed_gbps / 8;
+        } else {
+            _bdp = (_base_rtt) * 200 / 8;
+        }
+        _maxcwnd = _bdp;
+        _cwnd =  std::min(_cwnd, (uint32_t)_maxcwnd);
+    }
+
+
     mark_received(pkt);
 
     count_total_ack++;
@@ -442,7 +486,9 @@ void UecSrc::processAck(UecAck &pkt, bool force_marked) {
         this->_sink->_paths.clear();
 
         if (_atlahs_api) {
-            _atlahs_api->setNumberNacks(_nacks_received);
+            if (_atlahs_api->print_stats_flows) {
+                _atlahs_api->flowInfos.push_back(FlowInfo(timeAsUs(_flow_start_time), timeAsUs(eventlist().now()), timeAsUs(eventlist().now() - _flow_start_time), _flow_size, _nacks_received, _cwnd));
+            }
             _atlahs_api->EventFinished(*flow_over);
         }
             
@@ -460,7 +506,7 @@ void UecSrc::processAck(UecAck &pkt, bool force_marked) {
         // printf("Window Is %d - From %d To %d\n", _cwnd, from, to);
         current_pkt++;
         // printf("Triggering ADJ\n");
-        adjust_window(1, marked, 2);
+        adjust_window(1, marked, rtt);
 
         acked_bytes += _mss;
         good_bytes += _mss;
@@ -534,11 +580,36 @@ void UecSrc::receivePacket(Packet &pkt) {
 
 void UecSrc::adjust_window(simtime_picosec ts, bool ecn, simtime_picosec rtt) {
 
-    if (ecn) {
-        _cwnd -= _mss * 0.5;
-    } else {
-        _cwnd += 1.0/_cwnd;
+    if (algorithm_type == "mprdma") {
+        if (ecn) {
+            _cwnd -= _mss * 0.5;
+        } else {
+            _cwnd += 1.0/_cwnd;
+        }
+    } else if (algorithm_type == "min_cc") {
+        _cwnd = 1 * _mss;
+    } else if (algorithm_type == "no_cc") {
+        _cwnd = _bdp;
+    } else if (algorithm_type == "swift_like") {
+
+        //printf("Flow %s  - RTT %lu\n", _name.c_str(), rtt);
+        
+        if (rtt < target_rtt) {
+            // Additive increase:
+            if (_cwnd >= _mss) {
+                _cwnd += ((_mss * 2.0) / _cwnd) * _mss;
+            } else {
+                std::cerr << "Window below 1 MSS. Not supported.\n";
+                std::abort();
+            }
+        } else if (can_decrease) {
+            // Multiplicative decrease:
+            _cwnd *= std::max(1 - 1 * (rtt - (double)target_rtt) / rtt, 1 - 0.25);
+            last_decrease = eventlist().now();
+        }
+        //printf("Flow %s  - CWND %lu\n", _name.c_str(), _cwnd);
     }
+    
     check_limits_cwnd();
 }
 
@@ -633,6 +704,11 @@ void UecSrc::send_packets() {
         _highest_sent += _mss;
         _packets_sent += _mss;
         _unacked += _mss;
+
+        p->timestamp_sent = eventlist().now();
+
+        //printf("Flow %s - Send %lu - Cwnd %d\n", _name.c_str(), eventlist().now() / 1000, _cwnd);
+
 /* 
         printf("Sending packet from %s (%d) size %d at %lu %d vs %d ~ %d vs %d -- %d %d\n", _name.c_str(), flow_id(), p->size(), eventlist().now(), get_unacked()
            + _mss, _cwnd, _highest_sent, _flow_size, get_unacked() + _mss <= c, _highest_sent < _flow_size); 
@@ -890,6 +966,8 @@ void UecSink::receivePacket(Packet &pkt) {
     UecPacket::seq_t seqno = p->seqno();
     UecPacket::seq_t ackno = p->seqno() + p->data_packet_size() - 1;
 
+    simtime_picosec ts = p->timestamp_sent;
+
     bool marked = p->flags() & ECN_CE;
 
     // TODO: consider different ways to select paths
@@ -946,7 +1024,7 @@ void UecSink::receivePacket(Packet &pkt) {
 
     int32_t path_id = p->pathid();
 
-    send_ack(0, marked, seqno, ackno, _paths.at(crt_path), NULL,
+    send_ack(ts, marked, seqno, ackno, _paths.at(crt_path), NULL,
              path_id);
 }
 
@@ -985,6 +1063,7 @@ void UecSink::send_ack(simtime_picosec ts, bool marked, UecAck::seq_t seqno, Uec
     }
     assert(ack);
 
+    ack->timestamp_sent = ts;
     ack->sendOn();
 }
 
