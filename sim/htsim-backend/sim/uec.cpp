@@ -462,7 +462,7 @@ void UecSrc::processAck(UecAck &pkt, bool force_marked) {
         if (f_flow_over_hook) {
             f_flow_over_hook(pkt);
         }
-        //printf("Completion Time Flow %s is %f - Start Time %f - Overall Time %f - Size %d\n", _name.c_str(), timeAsUs(eventlist().now() - _flow_start_time), timeAsUs(_flow_start_time), timeAsUs(eventlist().now()), _flow_size);
+        printf("Completion Time Flow %s is %f - Start Time %f - Overall Time %f - Size %d\n", _name.c_str(), timeAsUs(eventlist().now() - _flow_start_time), timeAsUs(_flow_start_time), timeAsUs(eventlist().now()), _flow_size);
 
         /* printf("Overall Completion at %lu\n", GLOBAL_TIME); */
         if (_end_trigger) {
@@ -584,7 +584,6 @@ void UecSrc::adjust_window(simtime_picosec ts, bool ecn, simtime_picosec rtt) {
         if (ecn) {
             _cwnd -= _mss * 0.5;
         } else {
-            printf("Increased by %f\n", (_mss * _mss / _cwnd));
             _cwnd += _mss * _mss / _cwnd;
         }
     } else if (algorithm_type == "min_cc") {
