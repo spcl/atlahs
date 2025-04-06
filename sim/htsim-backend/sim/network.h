@@ -94,6 +94,9 @@ class Packet {
        destroy it, so it can be reused) */
     virtual void free();
 
+    simtime_picosec timestamp_sent;
+
+
     static void set_packet_size(int packet_size) {
         // Use Packet::set_packet_size() to change the default packet
         // size for TCP or NDP data packets.  You MUST call this

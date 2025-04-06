@@ -75,6 +75,7 @@ bool CompositeQueue::decide_ECN() {
     } else if (_queuesize_low > _ecn_minthresh) {
         uint64_t p = (0x7FFFFFFF * (_queuesize_low - _ecn_minthresh))/(_ecn_maxthresh - _ecn_minthresh);
         if ((uint64_t)random() < p) {
+            //printf("At Queue %s, ECN mark on deque - Size %lu\n", _nodename.c_str(), _queuesize_low);
             return true;
         }
     }
@@ -145,9 +146,14 @@ CompositeQueue::receivePacket(Packet& pkt)
 
     /* if (_queuesize_low > 4096 * 16) {
         printf(" queue name %s size %d -- From %d %d - Size %d - Is Ack %d\n", _nodename.c_str(), _queuesize_low, pkt.from, pkt.flow_id(), pkt.size(), pkt.is_ack);
-    } */
+    }  */
 
     if (!pkt.header_only()){
+
+        if (pkt.timestamp_sent == 0) {
+            pkt.timestamp_sent = eventlist().now();
+        }
+
         if (_queuesize_low+pkt.size() <= _maxsize  || drand()<0.5) {
             //regular packet; don't drop the arriving packet
 

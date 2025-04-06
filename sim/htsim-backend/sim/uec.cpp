@@ -437,6 +437,8 @@ void UecSrc::processAck(UecAck &pkt, bool force_marked) {
     uint64_t rtt = now_time - ts;
     rtt = rtt / 1000;
 
+    //printf("Sent at %lu - Received at %lu - RTT %lu\n", ts, now_time, rtt);
+
     if (rtt < _base_rtt) {
         _base_rtt = rtt;
         target_rtt = _base_rtt * 1.5;
@@ -609,7 +611,7 @@ void UecSrc::adjust_window(simtime_picosec ts, bool ecn, simtime_picosec rtt) {
             }
         } else if (can_decrease) {
             // Multiplicative decrease:
-            _cwnd *= std::max(1 - 1 * (rtt - (double)target_rtt) / rtt, 1 - 0.5);
+            _cwnd *= std::max(1 - 1 * (rtt - (double)target_rtt) / rtt, 1 - 0.25);
             last_decrease = eventlist().now();
         }
     }
@@ -863,6 +865,7 @@ bool UecSrc::resend_packet(std::size_t idx) {
     // printf("Resending to %d\n", this->from);
 
     p->set_pathid(_path_ids[crt]);
+    p->timestamp_sent = eventlist().now();
 
     p->flow().logTraffic(*p, *this, TrafficLogger::PKT_CREATE);
     /* printf("Send on at %lu -- %d %d\n", GLOBAL_TIME / 1000, pause_send, stop_after_quick); */
