@@ -132,6 +132,7 @@ UecSrc::UecSrc(UecLogger *logger, TrafficLogger *pktLogger, EventList &eventList
 
 
     if (algorithm_type == "mprdma") {
+        _cwnd = _cwnd / 2;
     } else if (algorithm_type == "min_cc") {
         _cwnd = 1 * _mss;
     } else if (algorithm_type == "no_cc") {
@@ -277,7 +278,7 @@ void UecSrc::processNack(UecNack &pkt) {
     _nacks_received++;
 
     if (algorithm_type == "mprdma") {
-            _cwnd -= _mss * 1;
+        _cwnd = _cwnd / 2;
     } else if (algorithm_type == "min_cc") {
         _cwnd = 1 * _mss;
     } else if (algorithm_type == "no_cc") {
@@ -462,7 +463,7 @@ void UecSrc::processAck(UecAck &pkt, bool force_marked) {
         if (f_flow_over_hook) {
             f_flow_over_hook(pkt);
         }
-        printf("Completion Time Flow %s is %f - Start Time %f - Overall Time %f - Size %d\n", _name.c_str(), timeAsUs(eventlist().now() - _flow_start_time), timeAsUs(_flow_start_time), timeAsUs(eventlist().now()), _flow_size);
+        //printf("Completion Time Flow %s is %f - Start Time %f - Overall Time %f - Size %d\n", _name.c_str(), timeAsUs(eventlist().now() - _flow_start_time), timeAsUs(_flow_start_time), timeAsUs(eventlist().now()), _flow_size);
 
         /* printf("Overall Completion at %lu\n", GLOBAL_TIME); */
         if (_end_trigger) {
@@ -592,12 +593,16 @@ void UecSrc::adjust_window(simtime_picosec ts, bool ecn, simtime_picosec rtt) {
         _cwnd = _bdp;
     } else if (algorithm_type == "swift_like") {
 
-        //printf("Flow %s  - RTT %lu\n", _name.c_str(), rtt);
+        //printf("Flow %s  - RTT %lu - Target RTT %lu\n", _name.c_str(), rtt, target_rtt);
+
+        if (eventlist().now() - last_decrease > _base_rtt) {
+            can_decrease = true;
+        }
         
         if (rtt < target_rtt) {
             // Additive increase:
             if (_cwnd >= _mss) {
-                _cwnd += ((_mss * 0.5) / _cwnd) * _mss;
+                _cwnd += ((_mss * 1.0) / _cwnd) * _mss;
             } else {
                 std::cerr << "Window below 1 MSS. Not supported.\n";
                 std::abort();
