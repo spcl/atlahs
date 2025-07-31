@@ -40,3 +40,6 @@
 [submodule "apps/ai/MMaDA"]
 	path = apps/ai/MMaDA
 	url = https://github.com/Gen-Verse/MMaDA.git
+[submodule "apps/ai/astra-sim"]
+	path = apps/ai/astra-sim
+	url = https://github.com/astra-sim/astra-sim.git
