@@ -176,7 +176,7 @@ def run_lgs_simulator(bin_file: str, sim_config: str, exec: str, verbose: bool) 
 
 def run_validation_exp_for_setup(setup_dir: str, result_dir: str, simulator: str,
                                  sim_config: str, exec: str, app_type: str,
-                                 overwrite: bool, verbose: bool) -> Tuple[int, int]:
+                                 overwrite: bool, verbose: bool) -> Tuple[float, int]:
     """
     Run the validation experiment for the given setup directory and store the results
     in the result directory.
@@ -297,7 +297,7 @@ if __name__ == '__main__':
     parser.add_argument('--app-type', type=str, default="hpc",
                         help="Type of application traces to be simulated. Options are 'hpc' and 'ai'.")
     parser.add_argument('-s', '--simulator', type=str, default="lgs",
-                        help='Network backend to use for the simulator. Options are "lgs", "htsim", and, "ns3".')
+                        help='Network backend to use for the simulator. Options are "lgs" and "htsim".')
     parser.add_argument('--exec', type=str, required=True,
                         help='Executable to use for the simulator.')
     args = parser.parse_args()
@@ -305,7 +305,7 @@ if __name__ == '__main__':
     print_info(f"Running validation experiment:")
     print_info(f"Trace directory: {args.trace_dir}")
     print_info(f"Result directory: {args.result_dir}")
-    assert args.simulator in ("lgs", "htsim", "ns3"), "Invalid simulator."
+    assert args.simulator in ("lgs", "htsim"), "Invalid simulator."
     print_info(f"Simulator: {args.simulator}")
     assert args.app_type in ("hpc", "ai"), "Invalid application type."
     print_info(f"Type of application traces: {args.app_type}")

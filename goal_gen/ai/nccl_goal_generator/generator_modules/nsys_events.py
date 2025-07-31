@@ -239,7 +239,7 @@ def get_nsys_events(dir_path):
                         gpuId = pid_to_gpuId[pid]
                         # if gpuId not in profile_interval:
                         #     continue
-                        if (gpuId in profiling_interval) and \
+                        if (gpuId in profile_interval) and \
                             (row[1] < profile_interval[gpuId]["start"] or row[1] > profile_interval[gpuId]["end"]):
                             continue
 

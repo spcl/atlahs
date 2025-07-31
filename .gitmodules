@@ -37,3 +37,6 @@
 [submodule "apps/ai/dlrm"]
 	path = apps/ai/dlrm
 	url = https://github.com/facebookresearch/dlrm.git
+[submodule "apps/ai/MMaDA"]
+	path = apps/ai/MMaDA
+	url = https://github.com/Gen-Verse/MMaDA.git

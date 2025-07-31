@@ -4,7 +4,7 @@
 #SBATCH --ntasks-per-node=1        # Do not change
 #SBATCH --gpus-per-node=1          # number of gpus per node
 #SBATCH --partition=normal
-#SBTACH --account a-g34
+#SBATCH --account a-g34
 #SBATCH --time=00:05:00            # total run time limit (HH:MM:SS)
 
 

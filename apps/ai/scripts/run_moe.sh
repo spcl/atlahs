@@ -4,7 +4,7 @@
 #SBATCH --ntasks-per-node=1        # Do not change
 #SBATCH --gpus-per-node=4          # number of gpus per node
 #SBATCH --partition=normal
-#SBTACH --account a-g34
+#SBATCH --account a-g34
 #SBATCH --time=00:10:00            # total run time limit (HH:MM:SS)
 
 # Default trace value (used only if --trace is provided)
@@ -200,7 +200,7 @@ fi
 if [[ "$USE_TRACING" == true && "$trace" == "astrasim" ]]; then
        TRAINING_ARGS=" \
               ${TRAINING_ARGS} \
-              --use-pytorch-profile \
+              --use-pytorch-profiler \
               --profile-step-start 8 \
               --profile-step-end 10 \
               "
