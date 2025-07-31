@@ -164,11 +164,8 @@ def build_hpc_apps(verbose: bool = True) -> None:
     assert os.path.exists(HPC_APPS_DIR), "HPC apps not found"
     os.chdir(HPC_APPS_DIR)
 
-    os.system("python3 build_apps.py -v -j 16 --app openmx")
-    # if os.system("python3 build_apps.py -v -j 16 --app all") != 0:
-    #     # For some unknown reason, the build script needs to be called twice
-    #     # to build MILC
-    #     os.system("python3 build_apps.py -v -j 16 --app milc")
+    os.system("python3 build_apps.py -v -j 16 --app cloverleaf")
+    
     os.chdir(CURR_DIR)
 
 

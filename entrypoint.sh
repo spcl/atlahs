@@ -1,5 +1,13 @@
 #!/bin/bash
 
+
+# ---- HPC deps: defaults (override with `docker run -e VAR=...` if needed)
+: "${HDF5_INSTALL_DIR:=/workspace/apps/hpc/deps/hdf5/install}"
+: "${NETCDF_C_INSTALL_DIR:=/workspace/apps/hpc/deps/netcdf-c/install}"
+: "${NETCDF_FORTRAN_INSTALL_DIR:=/workspace/apps/hpc/deps/netcdf-fortran/install}"
+
+export HDF5_INSTALL_DIR NETCDF_C_INSTALL_DIR NETCDF_FORTRAN_INSTALL_DIR
+
 # If no arguments were passed, print a usage message.
 if [ "$#" -eq 0 ]; then
   echo "Usage: docker run <image> <option> [<args>]"
