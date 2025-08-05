@@ -16,7 +16,6 @@ if [ "$#" -eq 0 ]; then
   echo "    -r: build the required applications for reproducing the results"
   echo "    -t: build all applications that are required for tracing and producing the GOAL schedules"
   echo "  run: run the benchmarks with the specified arguments, options are:"
-  echo "    -v: run the validation experiments for the artifact"
   echo "    -q: perform a quick run to show that the artifact is functional"
   echo "    -f: perform the full run to reproduce the results"
   exit 1
@@ -25,6 +24,9 @@ fi
 # Get the first argument which specifies the option
 option=$1
 shift
+
+
+DATA_DIR="/workspace/data"
 
 case $option in
   "build")
@@ -58,17 +60,11 @@ case $option in
     fi
     
     case $1 in
-      "-v")
-        echo "Running validation experiments..."
-        # Add validation experiment commands
-        ;;
       "-q") 
-        echo "Performing quick functionality test..."
-        # Add quick test commands
+        python3 /workspace/scripts/run.py -v -q -d $DATA_DIR
         ;;
       "-f")
-        echo "Performing full reproduction run..."
-        # Add full reproduction commands
+        python3 /workspace/scripts/run.py -v -f -d $DATA_DIR
         ;;
       *)
         echo "Error: Invalid run argument. Must be -v, -q, or -f"

@@ -8,6 +8,8 @@ This repository contains the source code for ATLAHS, a network simulator toolcha
 
 The paper of this work is available on arXiv: [https://arxiv.org/pdf/2505.08936](https://arxiv.org/pdf/2505.08936).
 
+Along with the source code, we also release all the traces (raw files and converted GOAL traces) used in the paper as the [ATLAHS Trace Collection](http://storage2.spcl.ethz.ch/traces/). Not only does it cover a wide range of AI and HPC applications, it is still growing, and we want to encourage the community to contribute more traces to the collection.
+
 ### Docker Environment
 To facilitate the reproducibility of the results which we publish in the paper, we provide a Docker image that contains all the dependencies that are required to run the ATLAHS toolchain.
 
@@ -16,3 +18,22 @@ To build the Docker image, run the following command:
 ```bash
 docker build -t atlahs .
 ```
+
+To compile the components required to reproduce the results in
+the paper, run:
+```bash
+docker run --user $(id -u):$(id -g) -v $(pwd):/workspace atlahs build -r
+```
+This mounts the project directory to `/workspace` inside the con-
+tainer and invokes the build.py script in the scripts directory.
+
+
+#### Running a quick test
+To run a quick test, run the following command:
+```bash
+docker run --user $(id -u):$(id -g) -v $(pwd):/workspace atlahs run -q
+```
+This fetches a small subset of the ATLAHS traces from the SPCL storage server,
+and tests the functionality of the ATLAHS toolchain. It converts the raw traces of
+AI (nsys-reports) and HPC (PMPI traces) applications into the [GOAL format](https://ieeexplore.ieee.org/document/5362477),
+and simulates the workloads with different backends (e.g., LogGOPSim, htsim) in ATLAHS.

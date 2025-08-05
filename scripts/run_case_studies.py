@@ -1,0 +1,1 @@
+# TODO: TOMMASO Add script to run the case studies
