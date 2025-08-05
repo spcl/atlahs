@@ -11,8 +11,17 @@ from tqdm import tqdm
 import yaml
 import re
 import subprocess
+from pathlib import Path
 
 from typing import List, Dict, Optional, Tuple
+
+# Path to the schedgen executable
+SCHEDGEN_EXEC_PATH = "/workspace/goal_gen/hpc/Schedgen/schedgen"
+# Path to the txt2bin executable
+TXT2BIN_EXEC_PATH = "/workspace/sim/LogGOPSim/txt2bin"
+
+# NCCL_GOAL_GEN_PATH
+NCCL_GOAL_GEN_PATH = "/workspace/goal_gen/ai/nccl_goal_generator/get_traced_events.py"
 
 # ===============================================
 # Utility functions
@@ -56,17 +65,12 @@ def print_info(message: str, verbose: bool = True, flush: bool = True) -> None:
         print(f"[INFO] {message}", flush=flush)
 
 
-def check_dir_exists(directory: str, overwrite: bool, verbose: bool) -> None:
+def check_dir_exists(directory: str, verbose: bool) -> None:
     """
     A utility function to check if the given directory exists and if it should be overwritten.
     """
     if os.path.exists(directory):
-        if overwrite:
-            print_warning(f"Directory {directory} already exists. Overwriting.", verbose)
-            os.removedirs(directory)
-            os.makedirs(directory, exist_ok=True)
-        else:
-            print_info(f"Directory {directory} already exists. Continuing without overwriting.", verbose)
+        print_info(f"Directory {directory} already exists. Continuing without overwriting.", verbose)
     else:
         os.makedirs(directory, exist_ok=True)
         print_info(f"Created directory {directory}.", verbose)
@@ -76,7 +80,7 @@ def write_results_to_csv(results: List[str], result_file: str, verbose: bool) ->
     """
     Write the results to a CSV file.
     """
-    with open(result_file, 'w') as f:
+    with open(result_file, 'a') as f:
         f.write("\n".join(results))
     print_success(f"Results written to {result_file}.", verbose)
 
@@ -174,39 +178,37 @@ def run_lgs_simulator(bin_file: str, sim_config: str, exec: str, verbose: bool) 
     return pred_runtime
 
 
-def run_validation_exp_for_setup(setup_dir: str, result_dir: str, simulator: str,
-                                 sim_config: str, exec: str, app_type: str,
-                                 overwrite: bool, verbose: bool) -> Tuple[float, int]:
+def run_validation_exp_for_workload(workload_dir: str, result_dir: str, simulator: str,
+                                    sim_config: str, exec: str, app_type: str,
+                                    verbose: bool) -> Tuple[float, int]:
     """
-    Run the validation experiment for the given setup directory and store the results
+    Run the validation experiment for the given workload directory and store the results
     in the result directory.
-    :param setup_dir: Directory containing the setup traces.
+    :param workload_dir: Directory containing the workload traces.
     :param result_dir: Directory to store the results.
     :param simulator: Simulator to use for the validation experiment.
     :param sim_config: Configuration file for the given simulator.
     :param exec: Executable to use for the simulator.
     :param app_type: Type of application traces to be simulated.
-    :param overwrite: Overwrite existing results.
     :param verbose: Print verbose output.
     @#return: Tuple containing two items, where the first item is the
     actual application runtime and second item is the predicted runtime.
     """
-    assert os.path.exists(setup_dir), f"Setup directory {setup_dir} does not exist."
+    assert os.path.exists(workload_dir), f"Workload directory {workload_dir} does not exist."
     
-    # Retrieves the trace directory and bin file for the given setup directory by
-    # iterating over the subdirectories in the setup directory
+    # Retrieves the trace directory and bin file for the given workload directory by
+    # iterating over the subdirectories in the workload directory
     trace_dir = None
     bin_file = None
-    for f in os.listdir(setup_dir):
+    for f in os.listdir(workload_dir):
         if f.endswith(".bin"):
-            bin_file = os.path.join(setup_dir, f)
-        if os.path.isdir(os.path.join(setup_dir, f)):
-            trace_dir = os.path.join(setup_dir, f)
+            bin_file = os.path.join(workload_dir, f)
+        if os.path.isdir(os.path.join(workload_dir, f)):
+            trace_dir = os.path.join(workload_dir, f)
             break
     
-    assert trace_dir is not None, f"No trace directory found in {setup_dir}."
-    assert bin_file is not None, f"No bin file found in {setup_dir}."
-    print_info(f"Found trace directory {trace_dir} and bin file {bin_file} inside {setup_dir}.", verbose)
+    assert trace_dir is not None, f"No trace directory found in {workload_dir}."
+    print_info(f"Found trace directory {trace_dir} and bin file {bin_file} inside {workload_dir}.", verbose)
 
     real_runtime = None
     if app_type == "hpc":
@@ -221,11 +223,11 @@ def run_validation_exp_for_setup(setup_dir: str, result_dir: str, simulator: str
     # Run the simulator to get the predicted runtime
     
     pred_runtime = None
-    if simulator == "lgs":
+    if simulator == "atlahs_lgs":
         pred_runtime = run_lgs_simulator(bin_file, sim_config, exec, verbose)
-    elif simulator == "htsim":
+    elif simulator == "atlahs_htsim":
         pass
-    elif simulator == "ns3":
+    elif simulator == "astra_sim":
         pass
     else:
         raise ValueError("Invalid simulator.")
@@ -234,11 +236,78 @@ def run_validation_exp_for_setup(setup_dir: str, result_dir: str, simulator: str
     print(f"[INFO] Predicted runtime: {pred_runtime / 1e9:.3f} s")
     return real_runtime, pred_runtime
 
+
+def convert_raw_traces_to_bin_for_hpc(workload_dir: str, workload_name: str, verbose: bool) -> None:
+    """
+    Convert the raw traces into bin file for the HPC traces.
+    """
+    assert os.path.exists(SCHEDGEN_EXEC_PATH), f"Schedgen executable {SCHEDGEN_EXEC_PATH} does not exist. Build the schedgen executable first."
+    trace_dir = os.path.join(workload_dir, "mpi_traces")
+    goal_file_path = os.path.join(workload_dir, f"{workload_name}.txt")
+    bin_file_path = os.path.join(workload_dir, f"{workload_name}.bin")
+    # Checks if the bin file already exists
+    if os.path.exists(bin_file_path):
+        print_info(f"bin file {bin_file_path} already exists. Skipping bin file generation.", verbose)
+        return
+    
+    # Checks if the GOAL file already exists, if it not, run the schedgen executable to convert the raw traces into GOAL file
+    if not os.path.exists(goal_file_path):
+        cmd = f"{SCHEDGEN_EXEC_PATH} --traces {trace_dir} -o {goal_file_path}"
+        print_info(f"Running command: {cmd}", verbose)
+        process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = process.communicate()
+        assert process.returncode == 0, f"Error running the schedgen: {err.decode()}"
+        print_info(f"Output: {out.decode()}", verbose)
+        print_success(f"Successfully converted the MPI traces into GOAL file for {workload_name}.", verbose)
+    
+    # Run the schedgen executable to convert the raw traces into bin file
+    cmd = f"{SCHEDGEN_EXEC_PATH} --traces {trace_dir} -o {goal_file_path}"
+    print_info(f"Running command: {cmd}", verbose)
+    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = process.communicate()
+    assert process.returncode == 0, f"Error running the schedgen: {err.decode()}"
+    print_info(f"Output: {out.decode()}", verbose)
+    print_success(f"Successfully converted the MPI traces into GOAL file for {workload_name}.", verbose)
+
+    assert os.path.exists(TXT2BIN_EXEC_PATH), f"txt2bin executable {TXT2BIN_EXEC_PATH} does not exist. Build the txt2bin executable first."
+    bin_file_path = os.path.join(workload_dir, f"{workload_name}.bin")
+    cmd = f"{TXT2BIN_EXEC_PATH} -i {goal_file_path} -o {bin_file_path}"
+    print_info(f"Running command: {cmd}", verbose)
+    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = process.communicate()
+    assert process.returncode == 0, f"Error running the txt2bin: {err.decode()}"
+    print_success(f"Successfully converted the GOAL file into bin file for {workload_name}.", verbose)
+
+
+def convert_raw_traces_to_bin_for_ai(trace_dir: str, workload_name: str, verbose: bool) -> None:
+    """
+    Convert the raw traces into bin file for the AI traces.
+    """
+    assert os.path.exists(NCCL_GOAL_GEN_PATH), f"NCCL goal generator executable {NCCL_GOAL_GEN_PATH} does not exist."
     
 
+
+def convert_raw_traces_to_bin(trace_dir: str, workload_name: str, verbose: bool, app_type: str) -> None:
+    """
+    Convert the raw traces into bin file as per the given app type.
+    :param trace_dir: Directory containing the traces.
+    :param workload_name: Name of the workload.
+    :param app_name: Name of the application.
+    :param verbose: Print verbose output.
+    :param app_type: Type of application traces to be simulated.
+    """
+    if app_type == "hpc":
+        convert_raw_traces_to_bin_for_hpc(trace_dir, workload_name, verbose)
+    elif app_type == "ai":
+        convert_raw_traces_to_bin_for_ai(trace_dir, workload_name, verbose)
+    else:
+        raise ValueError("Invalid application type.")
+
+
+
 def run_simulator(trace_dir: str, result_dir: str, simulator: str,
-                       sim_config: str, exec: str, app_type: str,
-                       overwrite: bool , verbose: bool) -> None:
+                  sim_config: str, exec: str, app_type: str,
+                  verbose: bool) -> None:
     """
     Run the validation experiment for the given trace directory and store the results
     in the result directory.
@@ -248,37 +317,25 @@ def run_simulator(trace_dir: str, result_dir: str, simulator: str,
     :param sim_config: Configuration file for the given simulator.
     :param exec: Executable to use for the simulator.
     :param app_type: Type of application traces to be simulated.
-    :param overwrite: Overwrite existing results.
     :param verbose: Print verbose output.
     """
     assert os.path.exists(trace_dir), f"Trace directory {trace_dir} does not exist."
-    check_dir_exists(result_dir, overwrite, verbose)
-
-    # Get the list of subdirectories in the trace directory
-    app_dirs = [os.path.join(trace_dir, d) for d in os.listdir(trace_dir) if os.path.isdir(os.path.join(trace_dir, d))]
-    
-    print_info(f"Found {len(app_dirs)} subdirectories in the trace directory.", verbose)
+    check_dir_exists(result_dir, verbose)
 
     # Iterate over the subdirectories and run the validation experiment
-    results = ["app_name,setup_name,real_runtime,pred_runtime"]
-    for app_dir in app_dirs:
-        app_name = os.path.basename(app_dir)
-        print_info(f"Running validation experiment for {app_name}.", verbose)
+    results = []
+    workload_name = Path(trace_dir).parent.name
+    app_name = Path(trace_dir).name.split("_")[0]
+    print_info(f"App: {app_name}, Workload: {workload_name}", verbose)
 
-        # Get the list of subdirectories in the app directory for different 
-        # setup of the same application
-        setup_dirs = [os.path.join(app_dir, d) for d in os.listdir(app_dir) if os.path.isdir(os.path.join(app_dir, d))]
-        print_info(f"Found {len(setup_dirs)} subdirectories in the app directory.", verbose)
+    # Converts the raw traces into bin file
+    convert_raw_traces_to_bin(trace_dir, workload_name, verbose, app_type)
 
-        # Iterate over the setup directories and run the validation experiment
-        for setup_dir in setup_dirs:
-            setup_name = os.path.basename(setup_dir)
-
-            # Run the validation experiment for the given setup
-            real_t, pred_t = run_validation_exp_for_setup(setup_dir, result_dir, simulator,
-                                                          sim_config, exec, app_type, overwrite, verbose)
-            print_info(f"{setup_name}, Real runtime: {real_t}, Predicted runtime: {pred_t}", verbose)
-            results.append(f"{app_name},{setup_name},{real_t},{pred_t}")
+    # Run the validation experiment for the given workload
+    real_t, pred_t = run_validation_exp_for_workload(trace_dir, result_dir, simulator,
+                                                      sim_config, exec, app_type, verbose)
+    print_info(f"{workload_name}, Real runtime: {real_t}, Predicted runtime: {pred_t}", verbose)
+    results.append(f"{workload_name},{real_t},{pred_t}")
     
     # Write the results to a CSV file
     result_file = os.path.join(result_dir, f"{simulator}_validation_results.csv")
@@ -291,7 +348,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--trace-dir', type=str, help='Directory containing the traces.')
     parser.add_argument('-o', '--result-dir', type=str, help='Directory to store the results.')
     parser.add_argument('-v', '--verbose', action='store_true', help='Print verbose output.')
-    parser.add_argument('--overwrite', action='store_true', help='Overwrite existing results.')
+    # TODO TOMMASO: Potentially add htsim configuration to a yaml file
     parser.add_argument('-c', '--config', type=str, default="configs/lgs_config.yaml",
                         help='Configuration file for the given simulator.')
     parser.add_argument('-t', '--app-type', type=str, default="ai",
@@ -313,5 +370,5 @@ if __name__ == '__main__':
     print_info(f"Executable: {args.exec}")
     
     run_simulator(args.trace_dir, args.result_dir, args.simulator, args.config,
-                       args.exec, args.app_type, args.overwrite, args.verbose)
+                       args.exec, args.app_type, args.verbose)
     print_success("Simulator completed successfully.")

@@ -8,19 +8,19 @@ VALIDATION_SCRIPT_PATH = "/workspace/scripts/run_validation_exp.py"
 
 def print_info(message: str, flush: bool = True) -> None:
     # Print the message in blue
-    print(f"\033[94m{message}\033[0m", flush=flush)
+    print(f"[INFO] {message}", flush=flush)
 
 def print_warning(message: str, verbose: bool = True, flush: bool = True) -> None:
     # Print the message in yellow
-    print(f"\033[93m{message}\033[0m", flush=flush)
+    print(f"\033[93m[WARNING] {message}\033[0m", flush=flush)
 
 def print_error(message: str, flush: bool = True) -> None:
     # Print the message in red
-    print(f"\033[91m{message}\033[0m", flush=flush)
+    print(f"\033[91m[ERROR] {message}\033[0m", flush=flush)
 
 def print_success(message: str, flush: bool = True) -> None:
     # Print the message in green
-    print(f"\033[92m{message}\033[0m", flush=flush)
+    print(f"\033[92m[SUCCESS] {message}\033[0m", flush=flush)
 
 STORAGE_SERVER_URL = "http://storage2.spcl.ethz.ch/traces/"
 ASTRASIM_URL = STORAGE_SERVER_URL + "astra-sim-traces/"
@@ -29,7 +29,7 @@ HPC_TRACE_URL = STORAGE_SERVER_URL + "hpc/"
 CASE_STUDY_URL = STORAGE_SERVER_URL + "case_studies/"
 
 
-DOWNLOAD_CMD = 'wget -r -np -nH --cut-dirs=4 -R "index.html*" -c -P "{}" "{}"'
+DOWNLOAD_CMD = 'wget -r -np -nH --cut-dirs={} -R "index.html*" -c -P "{}" "{}"'
 
 
 AI_TRACES_QUICK_TEST = ["llama/Llama7B_N4_GPU16_TP1_PP1_DP16_BS32", "llama/Llama7B_N32_GPU128_PP1_DP128_7B_BS128"]
@@ -41,7 +41,9 @@ CASE_STUDIES_QUICK_TEST = [
 
 
 AI_TRACES_FULL_REPRODUCTION = ["llama/Llama7B_N4_GPU16_TP1_PP1_DP16_BS32", "llama/Llama7B_N32_GPU128_PP1_DP128_7B_BS128"]
-ASTRASIM_TRACES_FULL_REPRODUCTION = ["llama_N4_GPU16", "llama_N32_GPU128", "llama_N64_GPU256", "MoE_N16_GPU64", "MoE_N32_GPU128", "MoE_N64_GPU256"]
+ASTRASIM_TRACES_FULL_REPRODUCTION = [
+    "llama_N4_GPU16", "llama_N32_GPU128", "llama_N64_GPU256","MoE_N16_GPU64", "MoE_N32_GPU128", "MoE_N64_GPU256"
+]
 HPC_TRACES_FULL_REPRODUCTION = [
     "lulesh/lulesh_8", "lulesh/lulesh_27", "lulesh/lulesh_64",
     "icon/icon_8", "icon/icon_32", "icon/icon_64",
@@ -66,10 +68,12 @@ def download_data(data_dir: str, is_quick_test: bool = True) -> None:
         # Download the validation traces for AI workloads
         ai_traces = AI_TRACES_QUICK_TEST
         hpc_traces = HPC_TRACES_QUICK_TEST
+        astrasim_traces = ASTRASIM_TRACES_QUICK_TEST
         case_studies = CASE_STUDIES_QUICK_TEST
     else:
         ai_traces = AI_TRACES_FULL_REPRODUCTION
         hpc_traces = HPC_TRACES_FULL_REPRODUCTION
+        astrasim_traces = ASTRASIM_TRACES_FULL_REPRODUCTION
         case_studies = CASE_STUDIES_FULL_REPRODUCTION
         # Warn the user that this would take a long time and require more than 250 GB of disk space
         print_warning("This would take a long time and require more than 250 GB of disk space to download the workloads for the full reproduction.")
@@ -78,17 +82,18 @@ def download_data(data_dir: str, is_quick_test: bool = True) -> None:
             print_error("Aborting...")
             exit(1)
 
+    # FIXME Code duplication
     # Download AI traces
     print_info("Downloading AI traces...")
     for trace in ai_traces:
-        print_info(f"Downloading {trace}...")
         src_url = AI_TRACE_URL + trace + "/nsys_reports/"
         target_dir = data_dir + "/ai/" + trace
+        print_info(f"Downloading {trace} to {target_dir}...")
         # Check if the directory already exists
         if os.path.exists(target_dir):
             print_warning(f"Skipping {trace} because it already exists...")
             continue
-        if os.system(DOWNLOAD_CMD.format(target_dir, src_url)) != 0:
+        if os.system(DOWNLOAD_CMD.format(4,target_dir, src_url)) != 0:
             print_error(f"Failed to download {trace}...")
             exit(1)
         print_success(f"Downloaded {trace}...")
@@ -96,19 +101,35 @@ def download_data(data_dir: str, is_quick_test: bool = True) -> None:
     # Download HPC traces
     print_info("Downloading HPC traces...")
     for trace in hpc_traces:
-        print_info(f"Downloading {trace}...")
         src_url = HPC_TRACE_URL + trace + "/mpi_traces/"
         target_dir = data_dir + "/hpc/" + trace
+        print_info(f"Downloading {trace} to {target_dir}...")
         # Check if the directory already exists
         if os.path.exists(target_dir):
             print_warning(f"Skipping {trace} because it already exists...")
             continue
         
-        if os.system(DOWNLOAD_CMD.format(target_dir, src_url)) != 0:
+        if os.system(DOWNLOAD_CMD.format(4, target_dir, src_url)) != 0:
             print_error(f"Failed to download {trace}...")
             exit(1)
         print_success(f"Downloaded {trace}...")
-    
+
+    # Download AstraSim traces
+    print_info("Downloading AstraSim traces...")
+    for trace in astrasim_traces:
+        src_url = ASTRASIM_URL + trace + "/"
+        target_dir = data_dir + "/astrasim/" + trace
+        print_info(f"Downloading {trace} to {target_dir}...")
+        # Check if the directory already exists
+        if os.path.exists(target_dir):
+            print_warning(f"Skipping {trace} because it already exists...")
+            continue
+        if os.system(DOWNLOAD_CMD.format(3, target_dir, src_url)) != 0:
+            print_error(f"Failed to download {trace}...")
+            exit(1)
+        print_success(f"Downloaded {trace}...")
+
+
     # Download case studies
     print_info("Downloading case studies...")
     # TODO: TOMMASO Add download commands for case studies
@@ -144,12 +165,15 @@ def run_quick_test(data_dir: str) -> None:
     print_info("Running a quick functionality test...")
     download_data(data_dir, is_quick_test=True)
     
+    assert os.path.exists(VALIDATION_SCRIPT_PATH), f"Validation script {VALIDATION_SCRIPT_PATH} does not exist."
     # Run the validation experiment for AI workloads
-    print_info("Running the validation experiment for AI workloads...")
-    # Run the validation experiment for AI workloads
-    os.system(f"python {VALIDATION_SCRIPT_PATH} -d {data_dir} -t ai -q")
+    # cmd = f"python {VALIDATION_SCRIPT_PATH} -d {data_dir} -t ai"
+    # print_info(f"Running command: {cmd}")
+    # assert os.system(cmd) == 0, "Error running the validation experiment for AI workloads."
     # Run the validation experiment for HPC workloads
-    os.system(f"python {VALIDATION_SCRIPT_PATH} -d {data_dir} -t hpc -q")
+    cmd = f"python {VALIDATION_SCRIPT_PATH} -d {data_dir} -t hpc"
+    print_info(f"Running command: {cmd}")
+    assert os.system(cmd) == 0, "Error running the validation experiment for HPC workloads."
 
     # TODO: TOMMASO Add experiment for case studies
 
@@ -179,7 +203,5 @@ if __name__ == "__main__":
     if not args.quick and not args.full:
         print_error("No run option provided. Please use -q or -f.")
         exit(1)
-    
-    print_info("Running the experiments needed for reproducing the results...")
 
     print_success("Done!")
