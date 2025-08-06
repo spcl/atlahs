@@ -78,3 +78,8 @@ case $option in
     exit 1
     ;;
 esac
+
+# Kill all wget processes
+pkill -9 wget
+# Exit the script
+exit 0

@@ -171,7 +171,7 @@ def run_quick_test(data_dir: str) -> None:
     # print_info(f"Running command: {cmd}")
     # assert os.system(cmd) == 0, "Error running the validation experiment for AI workloads."
     # Run the validation experiment for HPC workloads
-    cmd = f"python {VALIDATION_SCRIPT_PATH} -d {data_dir} -t hpc"
+    cmd = f"python {VALIDATION_SCRIPT_PATH} -d {data_dir} -t hpc --overwrite"
     print_info(f"Running command: {cmd}")
     assert os.system(cmd) == 0, "Error running the validation experiment for HPC workloads."
 

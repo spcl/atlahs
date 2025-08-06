@@ -76,56 +76,31 @@ def check_dir_exists(directory: str, verbose: bool) -> None:
         print_info(f"Created directory {directory}.", verbose)
 
 
-def write_results_to_csv(results: List[str], result_file: str, verbose: bool) -> None:
+def write_result_to_csv(pred_runtime: int, result_dir: str,
+                        app_type: str, simulator: str, workload_name: str) -> None:
+    """
+    A helper function to write the results to CSV files in the
+    result directory.
+    """
+    assert os.path.exists(result_dir), f"Result directory {result_dir} does not exist."
+    assert app_type in ["ai", "hpc"], "Invalid app type."
+    assert simulator in ["atlahs_lgs", "atlahs_htsim", "astra_sim"], "Invalid simulator."
+
+    output_file = os.path.join(result_dir, f"{simulator}.csv")
+    with open(output_file, "a") as f:
+        f.write(f"{workload_name},{pred_runtime}\n")
+    print_success(f"Wrote the predicted runtime to {output_file}")
+
+
+
+def write_results_to_csv(data: str, result_file: str, verbose: bool) -> None:
     """
     Write the results to a CSV file.
     """
     with open(result_file, 'a') as f:
-        f.write("\n".join(results))
+        f.write(data + "\n")
     print_success(f"Results written to {result_file}.", verbose)
 
-
-def get_real_runtime_for_ai_traces(trace_dir: str, verbose: bool) -> float:
-    """
-    Get the real runtime for the AI traces by subtracting the start time from the end time
-    in each of the trace files in the given directory.
-    """
-    raise NotImplementedError("Function not implemented yet.")
-
-
-def get_real_runtime_for_hpc_traces(trace_dir: str, verbose: bool) -> int:
-    """
-    Get the real runtime for the HPC traces by subtracting the start time from the end time
-    in each of the trace files in the given directory.
-    @return: The real runtime of the application in ns.
-    """
-    for trace_file in os.listdir(trace_dir):
-        trace_path = os.path.join(trace_dir, trace_file)
-        f = open(trace_path, 'r')
-        lines = f.readlines()
-
-        # Get the start time
-        start_time = None
-        end_time = None
-
-        for line in lines:
-            if line.startswith("MPI_Init_thread") or line.startswith("MPI_Init"):
-                tokens = line.split(":")
-                start_time = int(tokens[-1])
-                break
-        
-        for line in reversed(lines):
-            if line.startswith("MPI_Finalize"):
-                tokens = line.split(":")
-                end_time = int(tokens[1])
-                break
-        
-        assert start_time is not None, f"Start time not found in {trace_file}."
-        assert end_time is not None, f"End time not found in {trace_file}."
-
-        f.close()
-
-        return (end_time - start_time) * 1e3
             
 
 def get_pred_runtime_for_lgs_simulator(output: str, verbose: bool) -> int:
@@ -180,7 +155,7 @@ def run_lgs_simulator(bin_file: str, sim_config: str, exec: str, verbose: bool) 
 
 def run_validation_exp_for_workload(workload_dir: str, result_dir: str, simulator: str,
                                     sim_config: str, exec: str, app_type: str,
-                                    verbose: bool) -> Tuple[float, int]:
+                                    verbose: bool) -> int:
     """
     Run the validation experiment for the given workload directory and store the results
     in the result directory.
@@ -205,21 +180,10 @@ def run_validation_exp_for_workload(workload_dir: str, result_dir: str, simulato
             bin_file = os.path.join(workload_dir, f)
         if os.path.isdir(os.path.join(workload_dir, f)):
             trace_dir = os.path.join(workload_dir, f)
-            break
     
     assert trace_dir is not None, f"No trace directory found in {workload_dir}."
-    print_info(f"Found trace directory {trace_dir} and bin file {bin_file} inside {workload_dir}.", verbose)
-
-    real_runtime = None
-    if app_type == "hpc":
-        real_runtime = get_real_runtime_for_hpc_traces(trace_dir, verbose)
-    elif app_type == "ai":
-        real_runtime = get_real_runtime_for_ai_traces(trace_dir, verbose)
-    else:
-        raise ValueError("Invalid application type.")
-
-    assert real_runtime is not None, "Real runtime not found."
-    print(f"[INFO] Real runtime: {real_runtime / 1e9:.3f} s")
+    print_info(f"Found trace directory {trace_dir} and bin file {bin_file} inside {workload_dir}", verbose)
+    assert bin_file is not None, f"No bin file found in {workload_dir}."
     # Run the simulator to get the predicted runtime
     
     pred_runtime = None
@@ -234,7 +198,7 @@ def run_validation_exp_for_workload(workload_dir: str, result_dir: str, simulato
     
     assert pred_runtime is not None, "Predicted runtime not found."
     print(f"[INFO] Predicted runtime: {pred_runtime / 1e9:.3f} s")
-    return real_runtime, pred_runtime
+    return pred_runtime
 
 
 def convert_raw_traces_to_bin_for_hpc(workload_dir: str, workload_name: str, verbose: bool) -> None:
@@ -243,8 +207,10 @@ def convert_raw_traces_to_bin_for_hpc(workload_dir: str, workload_name: str, ver
     """
     assert os.path.exists(SCHEDGEN_EXEC_PATH), f"Schedgen executable {SCHEDGEN_EXEC_PATH} does not exist. Build the schedgen executable first."
     trace_dir = os.path.join(workload_dir, "mpi_traces")
-    goal_file_path = os.path.join(workload_dir, f"{workload_name}.txt")
+    goal_file_path = os.path.join(workload_dir, f"{workload_name}.goal")
     bin_file_path = os.path.join(workload_dir, f"{workload_name}.bin")
+    rank_file_path = os.path.join(trace_dir, "pmpi-trace-rank-0.txt")
+    assert os.path.exists(rank_file_path), f"PMPI trace file {rank_file_path} does not exist."
     # Checks if the bin file already exists
     if os.path.exists(bin_file_path):
         print_info(f"bin file {bin_file_path} already exists. Skipping bin file generation.", verbose)
@@ -252,22 +218,13 @@ def convert_raw_traces_to_bin_for_hpc(workload_dir: str, workload_name: str, ver
     
     # Checks if the GOAL file already exists, if it not, run the schedgen executable to convert the raw traces into GOAL file
     if not os.path.exists(goal_file_path):
-        cmd = f"{SCHEDGEN_EXEC_PATH} --traces {trace_dir} -o {goal_file_path}"
+        cmd = f"{SCHEDGEN_EXEC_PATH} -p trace --traces {rank_file_path} -o {goal_file_path}"
         print_info(f"Running command: {cmd}", verbose)
         process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = process.communicate()
         assert process.returncode == 0, f"Error running the schedgen: {err.decode()}"
         print_info(f"Output: {out.decode()}", verbose)
         print_success(f"Successfully converted the MPI traces into GOAL file for {workload_name}.", verbose)
-    
-    # Run the schedgen executable to convert the raw traces into bin file
-    cmd = f"{SCHEDGEN_EXEC_PATH} --traces {trace_dir} -o {goal_file_path}"
-    print_info(f"Running command: {cmd}", verbose)
-    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    out, err = process.communicate()
-    assert process.returncode == 0, f"Error running the schedgen: {err.decode()}"
-    print_info(f"Output: {out.decode()}", verbose)
-    print_success(f"Successfully converted the MPI traces into GOAL file for {workload_name}.", verbose)
 
     assert os.path.exists(TXT2BIN_EXEC_PATH), f"txt2bin executable {TXT2BIN_EXEC_PATH} does not exist. Build the txt2bin executable first."
     bin_file_path = os.path.join(workload_dir, f"{workload_name}.bin")
@@ -322,9 +279,7 @@ def run_simulator(trace_dir: str, result_dir: str, simulator: str,
     assert os.path.exists(trace_dir), f"Trace directory {trace_dir} does not exist."
     check_dir_exists(result_dir, verbose)
 
-    # Iterate over the subdirectories and run the validation experiment
-    results = []
-    workload_name = Path(trace_dir).parent.name
+    workload_name = Path(trace_dir).name
     app_name = Path(trace_dir).name.split("_")[0]
     print_info(f"App: {app_name}, Workload: {workload_name}", verbose)
 
@@ -332,14 +287,12 @@ def run_simulator(trace_dir: str, result_dir: str, simulator: str,
     convert_raw_traces_to_bin(trace_dir, workload_name, verbose, app_type)
 
     # Run the validation experiment for the given workload
-    real_t, pred_t = run_validation_exp_for_workload(trace_dir, result_dir, simulator,
+    pred_t = run_validation_exp_for_workload(trace_dir, result_dir, simulator,
                                                       sim_config, exec, app_type, verbose)
-    print_info(f"{workload_name}, Real runtime: {real_t}, Predicted runtime: {pred_t}", verbose)
-    results.append(f"{workload_name},{real_t},{pred_t}")
+    print_info(f"{workload_name}, Predicted runtime: {pred_t}", verbose)
     
-    # Write the results to a CSV file
-    result_file = os.path.join(result_dir, f"{simulator}_validation_results.csv")
-    write_results_to_csv(results, result_file, verbose)
+    # Write the results to CSV files
+    write_result_to_csv(pred_t, result_dir, app_type, simulator, workload_name)
 
 
 
