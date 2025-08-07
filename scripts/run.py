@@ -33,16 +33,20 @@ DOWNLOAD_CMD = 'wget -r -np -nH --cut-dirs={} -R "index.html*" -c -P "{}" "{}"'
 
 
 AI_TRACES_QUICK_TEST = ["llama/Llama7B_N4_GPU16_TP1_PP1_DP16_BS32", "llama/Llama7B_N32_GPU128_PP1_DP128_7B_BS128"]
-ASTRASIM_TRACES_QUICK_TEST = ["llama_N4_GPU16", "llama_N32_GPU128"]
+ASTRASIM_TRACES_QUICK_TEST = ["Llama7B_N4_GPU16_TP1_PP1_DP16_BS32", "Llama7B_N32_GPU128_PP1_DP128_7B_BS128"]
 HPC_TRACES_QUICK_TEST = ["lulesh/lulesh_8", "icon/icon_8", "hpcg/hpcg_8"]
 CASE_STUDIES_QUICK_TEST = [
     # TODO: TOMMASO Add case studies for the quick test
 ]
 
 
-AI_TRACES_FULL_REPRODUCTION = ["llama/Llama7B_N4_GPU16_TP1_PP1_DP16_BS32", "llama/Llama7B_N32_GPU128_PP1_DP128_7B_BS128"]
+AI_TRACES_FULL_REPRODUCTION = [
+    "llama/Llama7B_N4_GPU16_TP1_PP1_DP16_BS32", "llama/Llama7B_N32_GPU128_PP1_DP128_7B_BS128", "llama/Llama70B_N64_GPU256_TP1_PP8_DP32_70B_BS32", 
+    "moe/MoE8x8B_N16_GPU64_TP1_PP8_DP8_EP1_7B_BS32", "moe/MoE8x13B_N32_GPU128_TP4_PP4_DP8_EP4_13B_BS128", "moe/MoE8x70B_N64_GPU256_TP4_PP8_DP8_EP8_70B_BS128"
+]
 ASTRASIM_TRACES_FULL_REPRODUCTION = [
-    "llama_N4_GPU16", "llama_N32_GPU128", "llama_N64_GPU256","MoE_N16_GPU64", "MoE_N32_GPU128", "MoE_N64_GPU256"
+    "Llama7B_N4_GPU16_TP1_PP1_DP16_BS32", "Llama7B_N32_GPU128_PP1_DP128_7B_BS128", "Llama70B_N64_GPU256_TP1_PP8_DP32_70B_BS32",
+    "MoE8x8B_N16_GPU64_TP1_PP8_DP8_EP1_7B_BS32", "MoE8x13B_N32_GPU128_TP4_PP4_DP8_EP4_13B_BS128", "MoE8x70B_N64_GPU256_TP4_PP8_DP8_EP8_70B_BS128"
 ]
 HPC_TRACES_FULL_REPRODUCTION = [
     "lulesh/lulesh_8", "lulesh/lulesh_27", "lulesh/lulesh_64",
@@ -167,9 +171,9 @@ def run_quick_test(data_dir: str) -> None:
     
     assert os.path.exists(VALIDATION_SCRIPT_PATH), f"Validation script {VALIDATION_SCRIPT_PATH} does not exist."
     # Run the validation experiment for AI workloads
-    # cmd = f"python {VALIDATION_SCRIPT_PATH} -d {data_dir} -t ai"
-    # print_info(f"Running command: {cmd}")
-    # assert os.system(cmd) == 0, "Error running the validation experiment for AI workloads."
+    cmd = f"python {VALIDATION_SCRIPT_PATH} -d {data_dir} -t ai --overwrite"
+    print_info(f"Running command: {cmd}")
+    assert os.system(cmd) == 0, "Error running the validation experiment for AI workloads."
     # Run the validation experiment for HPC workloads
     cmd = f"python {VALIDATION_SCRIPT_PATH} -d {data_dir} -t hpc --overwrite"
     print_info(f"Running command: {cmd}")

@@ -1,12 +1,26 @@
-## ATLAHS: An Application-centric Network Simulator Toolchain for AI, HPC, and Storage
+<div align="center">
 
+
+ATLAHS Simulator Toolchain
+===================
+An Application-centric Network Simulator Toolchain for AI, HPC, and Distributed Storage
+
+<div align="left">
+
+
+## Warning
+This repository is still under active development. The code is not yet stable, and the documentation is not yet finalized.
+It is highly recommended to start using the toolchain after the paper is published, and when the documentation is mostly complete.
+
+## Overview
 ![Overview](docs/overview.png)
 
 This repository contains the source code for ATLAHS, a network simulator toolchain for AI, HPC, and storage applications. It contains the following components:
 - GOAL (Group Operation Assembly Language) generators that traces AI, HPC, and storage applications and converts them into network workloads usable by network simulators
-- Various backends for simulating network workloads, including LogGOPSim, HTSim, and NS-3
+- Various backends for simulating network workloads, including LogGOPSim, HTSim, and NS-3.
 
-The paper of this work is available on arXiv: [https://arxiv.org/pdf/2505.08936](https://arxiv.org/pdf/2505.08936).
+
+The paper of this work is available on arXiv: [https://arxiv.org/pdf/2505.08936](https://arxiv.org/pdf/2505.08936), and it has been accepted by The International Conference for High Performance Computing, Networking, Storage and Analysis (SC25).
 
 Along with the source code, we also release all the traces (raw files and converted GOAL traces) used in the paper as the [ATLAHS Trace Collection](http://storage2.spcl.ethz.ch/traces/). Not only does it cover a wide range of AI and HPC applications, it is still growing, and we want to encourage the community to contribute more traces to the collection.
 

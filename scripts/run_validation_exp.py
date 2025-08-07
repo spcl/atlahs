@@ -2,6 +2,7 @@ import os
 import argparse
 import sys
 import shutil
+import subprocess
 from pathlib import Path
 from typing import List, Tuple, Dict, Optional, overload
 
@@ -10,13 +11,16 @@ RUN_SIMULATOR_SCRIPT_PATH = "/workspace/scripts/run_simulator.py"
 
 OUTPUT_DIR = "/workspace/data/validation/"
 
-LGS_CONFIG_PATH = "/workspace/scripts/configs/lgs_config.yaml"
+LGS_CONFIG_PATH = "/workspace/scripts/configs/lgs_{}_config.yaml"
+
+AI_RUNTIME_SCRIPT = "/workspace/scripts/get_measured_runtime_ai.py"
+NSYS_REP_TO_SQLITE_SCRIPT = "/workspace/scripts/nsys_reports_to_sqlite.sh"
 
 LGS_EXEC_PATH = "/workspace/sim/LogGOPSim/LogGOPSim"
 # TODO Tommaso: Add htsim executable path
-HT_SIM_EXEC_PATH = ""
-ASTRA_SIM_EXEC_SCRIPT = "/workspace/apps/ai/astra-sim/example/run_network_analytical.sh"
-
+# HTSIM_EXEC_PATH = ""
+ASTRA_SIM_EXEC_SCRIPT = "/workspace/apps/ai/astra-sim/examples/network_analytical/run_network_analytical.sh"
+ASTRA_SIM_CONFIG_PATH = "/workspace/scripts/configs/astrasim_network.yml"
 
 def print_warning(message: str, flush: bool = True) -> None:
     print(f"\033[93m[WARNING] {message}\033[0m", flush=flush)
@@ -153,8 +157,36 @@ def get_real_runtime_for_ai_traces(trace_dir: str) -> float:
     in each of the trace files in the given directory.
     @return: The real runtime of the application in ns.
     """
-    # FIXME Implement this
-    return 0.0
+    assert os.path.exists(trace_dir), f"Trace directory {trace_dir} does not exist."
+
+    # Checks if the sqlite database files are present, the number of
+    # sqlite database files should be equal to the number of nsys reports
+    sqlite_files = [f for f in os.listdir(trace_dir) if f.endswith(".sqlite")]
+    nsys_reports = [f for f in os.listdir(trace_dir) if f.endswith(".nsys-rep")]
+    
+    if len(sqlite_files) != len(nsys_reports):
+        # Convert the nsys reports to sqlite database files
+        cmd = f"bash {NSYS_REP_TO_SQLITE_SCRIPT} {trace_dir}"
+        print_info(f"Running command: {cmd}")
+        assert os.system(cmd) == 0, f"Error converting the nsys reports to sqlite database files."
+    else:
+        print_info(f"Found {len(sqlite_files)} sqlite database files. Skipping conversion...")
+    
+    # Get real runtime from the sqlite database files
+    cmd = f"python3 {AI_RUNTIME_SCRIPT} {trace_dir}"
+    print_info(f"Running command: {cmd}")
+    # os.system(cmd)
+    # Fetches the output of the command
+    output = subprocess.check_output(cmd, shell=True).decode("utf-8")
+    # print_info(f"Output: {output}")
+    # Extracts the real runtime from the output
+    for line in output.split("\n"):
+        if line.startswith("Measured runtime:"):
+            tokens = line.split()
+            real_runtime = float(tokens[2])
+            break
+    
+    return real_runtime
 
 
 def get_real_runtime_for_workload(workload_dir: str, app_type: str) -> float:
@@ -172,6 +204,23 @@ def get_real_runtime_for_workload(workload_dir: str, app_type: str) -> float:
         raise ValueError("Invalid app type.")
     
 
+def write_ai_workload_trace_sizes(goal_sizes: Dict[str, int],
+                                  chakra_sizes: Dict[str, int]) -> None:
+    """
+    A helper function that writes the size of the bin file for the AI workload to
+    the `trace_sizes.csv` file in the result directory.
+    """
+    assert len(goal_sizes) == len(chakra_sizes), "The number of goal and chakra sizes must be the same."
+
+    trace_size_file = os.path.join(OUTPUT_DIR, "ai", "trace_sizes.csv")
+    with open(trace_size_file, "w") as f:
+        f.write("workload_name,goal_size,chakra_size\n")
+        for workload_name in goal_sizes.keys():
+            f.write(f"{workload_name},{goal_sizes[workload_name]},{chakra_sizes[workload_name]}\n")
+    
+    print_success(f"Wrote the trace sizes to {trace_size_file}")
+    
+
 def run_validation_exp(data_dir: str, app_type: str, overwrite: bool, verbose: bool) -> None:
     """
     Runs the validation experiment for the given data directory.
@@ -180,13 +229,18 @@ def run_validation_exp(data_dir: str, app_type: str, overwrite: bool, verbose: b
 
     workload_dirs = get_workload_dirs(data_dir, app_type)
     astrasim_workload_dirs = get_astrasim_workload_dirs(data_dir) if app_type == "ai" else []
+    if app_type == "ai":
+        print_info(f"AstraSim workload directories: {astrasim_workload_dirs}")
     
     if overwrite:
         # Delete the result directory
-        result_dir = os.path.join(data_dir, "validation")
+        result_dir = os.path.join(OUTPUT_DIR, app_type)
         if os.path.exists(result_dir):
             shutil.rmtree(result_dir)
             print_success(f"Overwriting existing results...")
+
+    goal_sizes = {}
+    chakra_sizes = {}
 
     for workload_dir in workload_dirs:
         # Get the real runtime for the workload
@@ -198,21 +252,40 @@ def run_validation_exp(data_dir: str, app_type: str, overwrite: bool, verbose: b
 
         # Run the LGS simulator
         output_dir = os.path.join(OUTPUT_DIR, app_type)
-        lgs_cmd = f"python3 {RUN_SIMULATOR_SCRIPT_PATH} -i {workload_dir} -o {output_dir} -v -c {LGS_CONFIG_PATH} -s atlahs_lgs -t {app_type} --exec {LGS_EXEC_PATH}"
+        lgs_config_path = LGS_CONFIG_PATH.format(app_type)
+        lgs_cmd = f"python3 {RUN_SIMULATOR_SCRIPT_PATH} -i {workload_dir} -o {output_dir} -v -c {lgs_config_path} -s atlahs_lgs -t {app_type} --exec {LGS_EXEC_PATH}"
         print_info(f"Running command: {lgs_cmd}")
         assert os.system(lgs_cmd) == 0, f"Error running the LGS simulator for {workload_dir}."
 
         htsim_cmd = "" # TODO Tommaso: Add htsim command
 
         # astrasim_cmd = f"bash {ASTRA_SIM_EXEC_SCRIPT} -i {workload_dir} -o {output_dir} -v -c {ASTRA_SIM_CONFIG_PATH} -s astra_sim -t {app_type} -e {ASTRA_SIM_EXEC_PATH}"
+        if app_type == "ai":
+            # Get the size of the bin file in MiB
+            bin_file_path = os.path.join(workload_dir, f"{workload_name}.bin")
+            assert os.path.exists(bin_file_path), f"Bin file {bin_file_path} does not exist."
+            bin_file_size = os.path.getsize(bin_file_path)
+            goal_sizes[workload_name] = bin_file_size / (1024 * 1024)
+            print_info(f"Bin size for {workload_name}: {goal_sizes[workload_name]} MiB")
 
     if app_type == "ai":
         for workload_dir in astrasim_workload_dirs:
-            pass
-            # output_dir = os.path.join(OUTPUT_DIR, "astrasim")
-            # astrasim_cmd = f"bash {ASTRA_SIM_EXEC_SCRIPT} -i {workload_dir} -o {output_dir} -v -c {ASTRA_SIM_CONFIG_PATH} -s astra_sim -t {app_type} -e {ASTRA_SIM_EXEC_PATH}"
-            # print_info(f"Running command: {astrasim_cmd}")
-            # assert os.system(astrasim_cmd) == 0, f"Error running the AstraSim simulator for {workload_dir}."
+            astrasim_cmd = f"python3 {RUN_SIMULATOR_SCRIPT_PATH} -i {workload_dir} -o {output_dir} -v -c {ASTRA_SIM_CONFIG_PATH} -s astra_sim -t {app_type} --exec {ASTRA_SIM_EXEC_SCRIPT}"
+            print_info(f"Running command: {astrasim_cmd}")
+            assert os.system(astrasim_cmd) == 0, f"Error running the AstraSim simulator for {workload_dir}."
+
+            # Get the size of the trace directory which contains the chakra files
+            workload_name = Path(workload_dir).name
+            chakra_dir_size = 0
+            for chakra_file in os.listdir(workload_dir):
+                if chakra_file.endswith(".et"):
+                    chakra_file_path = os.path.join(workload_dir, chakra_file)
+                    chakra_dir_size += os.path.getsize(chakra_file_path)
+            chakra_sizes[workload_name] = chakra_dir_size / (1024 * 1024)
+            print_info(f"Chakra size for {workload_name}: {chakra_sizes[workload_name]} MiB")
+
+    if app_type == "ai":
+        write_ai_workload_trace_sizes(goal_sizes, chakra_sizes)
 
 
 if __name__ == "__main__":

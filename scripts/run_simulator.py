@@ -1,9 +1,3 @@
-"""
-Runs the validation experiment for the paper by iterating over the directories
-containing the traces and running the validation experiment for each trace.
-Results will be stored in the results directory as CSV files and plots.
-"""
-
 import os
 import argparse
 import pandas as pd
@@ -22,6 +16,11 @@ TXT2BIN_EXEC_PATH = "/workspace/sim/LogGOPSim/txt2bin"
 
 # NCCL_GOAL_GEN_PATH
 NCCL_GOAL_GEN_PATH = "/workspace/goal_gen/ai/nccl_goal_generator/get_traced_events.py"
+NPKIT_SIMPLE_PATH = "/workspace/goal_gen/ai/nccl_goal_generator/npkit_benchmark_results/clariden/npkit_data_summary_Simple.json"
+NPKIT_LL_PATH = "/workspace/goal_gen/ai/nccl_goal_generator/npkit_benchmark_results/clariden/npkit_data_summary_LL.json"
+
+# Path to the AstraSim system configuration file
+ASTRA_SIM_SYSTEM_PATH = "/workspace/scripts/configs/astrasim_sys.json"
 
 # ===============================================
 # Utility functions
@@ -153,6 +152,48 @@ def run_lgs_simulator(bin_file: str, sim_config: str, exec: str, verbose: bool) 
     return pred_runtime
 
 
+def run_astrasim_simulator(workload_dir: str, network_config: str, exec: str, verbose: bool) -> int:
+    """
+    Run the AstraSim simulator for the given binary file and configuration file.
+    @return: The predicted runtime of the application in ns.
+    """
+    assert os.path.exists(workload_dir), f"Workload directory {workload_dir} does not exist."
+    assert os.path.exists(network_config), f"Network configuration file {network_config} does not exist."
+    assert os.path.exists(exec), f"Executable {exec} does not exist."
+    
+    # Counts the number of files in the workload directory
+    npu_count = len(os.listdir(workload_dir))
+    print_info(f"Number of NPUs: {npu_count}", verbose)
+
+    # Modidfy the content of the network configuration file to specify the number of NPUs
+    # Note that the configuration file is a yaml file
+    with open(network_config, 'r') as f:
+        content = yaml.load(f, Loader=yaml.FullLoader)
+    content["npus_count"] = [4, npu_count // 4]
+    with open(network_config, 'w') as f:
+        yaml.dump(content, f)
+
+    # Sets the environment variables for the AstraSim simulator
+    os.environ["ASTRA_SIM_WORKLOAD"] = workload_dir + "/chakra"
+    os.environ["ASTRA_SIM_NETWORK"] = network_config
+    os.environ["ASTRA_SIM_SYSTEM"] = ASTRA_SIM_SYSTEM_PATH
+
+    cmd = f"bash {exec}"
+    print_info(f"Running command: {cmd}", verbose)
+    # assert os.system(cmd) == 0, f"Error running the AstraSim simulator."
+    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = process.communicate()
+    assert process.returncode == 0, f"Error running the AstraSim simulator: {err.decode()}"
+    # Iterates through the output and find the pattern "finished, (\d+) cycles",
+    # and returns the maximum number of cycles found in the output
+    pattern = r"finished, (\d+) cycle"
+    # Finds all the matches in the output
+    matches = re.findall(pattern, out.decode())
+    assert len(matches) > 0, "Error parsing the output of the AstraSim simulator."
+    pred_runtime = int(max([int(m) for m in matches]))
+    return pred_runtime
+
+
 def run_validation_exp_for_workload(workload_dir: str, result_dir: str, simulator: str,
                                     sim_config: str, exec: str, app_type: str,
                                     verbose: bool) -> int:
@@ -170,6 +211,10 @@ def run_validation_exp_for_workload(workload_dir: str, result_dir: str, simulato
     actual application runtime and second item is the predicted runtime.
     """
     assert os.path.exists(workload_dir), f"Workload directory {workload_dir} does not exist."
+
+    if simulator == "astra_sim":
+        pred_runtime = run_astrasim_simulator(workload_dir, sim_config, exec, verbose)
+        return pred_runtime
     
     # Retrieves the trace directory and bin file for the given workload directory by
     # iterating over the subdirectories in the workload directory
@@ -190,8 +235,7 @@ def run_validation_exp_for_workload(workload_dir: str, result_dir: str, simulato
     if simulator == "atlahs_lgs":
         pred_runtime = run_lgs_simulator(bin_file, sim_config, exec, verbose)
     elif simulator == "atlahs_htsim":
-        pass
-    elif simulator == "astra_sim":
+        # TODO TOMMASO: Implement the function to run the HTSIM simulator
         pass
     else:
         raise ValueError("Invalid simulator.")
@@ -236,12 +280,28 @@ def convert_raw_traces_to_bin_for_hpc(workload_dir: str, workload_name: str, ver
     print_success(f"Successfully converted the GOAL file into bin file for {workload_name}.", verbose)
 
 
-def convert_raw_traces_to_bin_for_ai(trace_dir: str, workload_name: str, verbose: bool) -> None:
+def convert_raw_traces_to_bin_for_ai(workload_dir: str, workload_name: str, verbose: bool) -> None:
     """
     Convert the raw traces into bin file for the AI traces.
     """
     assert os.path.exists(NCCL_GOAL_GEN_PATH), f"NCCL goal generator executable {NCCL_GOAL_GEN_PATH} does not exist."
+    trace_dir = os.path.join(workload_dir, "nsys_reports")
+    bin_file_path = os.path.join(workload_dir, f"{workload_name}.bin")
+    goal_file_path = os.path.join(workload_dir, f"InterNode_MicroEvents_Dependency.goal")
+    if os.path.exists(bin_file_path):
+        print_info(f"bin file {bin_file_path} already exists. Skipping bin file generation.", verbose)
+        return
     
+    if not os.path.exists(goal_file_path):
+        cmd = f"python3 {NCCL_GOAL_GEN_PATH} -i {trace_dir} -o {workload_dir} -q --unique-nic --merge-non-overlap -l {NPKIT_LL_PATH} -s {NPKIT_SIMPLE_PATH}"
+        print_info(f"Running command: {cmd}", verbose)
+        assert os.system(cmd) == 0, f"Error running the nccl goal generator."
+        print_success(f"Successfully converted the raw traces into GOAL file for {workload_name}.", verbose)
+    
+    cmd = f"{TXT2BIN_EXEC_PATH} -i {goal_file_path} -o {bin_file_path}"
+    print_info(f"Running command: {cmd}", verbose)
+    assert os.system(cmd) == 0, f"Error running the txt2bin."
+    print_success(f"Successfully converted the GOAL file into bin file for {workload_name}.", verbose)
 
 
 def convert_raw_traces_to_bin(trace_dir: str, workload_name: str, verbose: bool, app_type: str) -> None:
@@ -283,12 +343,13 @@ def run_simulator(trace_dir: str, result_dir: str, simulator: str,
     app_name = Path(trace_dir).name.split("_")[0]
     print_info(f"App: {app_name}, Workload: {workload_name}", verbose)
 
-    # Converts the raw traces into bin file
-    convert_raw_traces_to_bin(trace_dir, workload_name, verbose, app_type)
+    if simulator != "astra_sim":
+        # Converts the raw traces into bin file
+        convert_raw_traces_to_bin(trace_dir, workload_name, verbose, app_type)
 
     # Run the validation experiment for the given workload
     pred_t = run_validation_exp_for_workload(trace_dir, result_dir, simulator,
-                                                      sim_config, exec, app_type, verbose)
+                                             sim_config, exec, app_type, verbose)
     print_info(f"{workload_name}, Predicted runtime: {pred_t}", verbose)
     
     # Write the results to CSV files
@@ -302,7 +363,7 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--result-dir', type=str, help='Directory to store the results.')
     parser.add_argument('-v', '--verbose', action='store_true', help='Print verbose output.')
     # TODO TOMMASO: Potentially add htsim configuration to a yaml file
-    parser.add_argument('-c', '--config', type=str, default="configs/lgs_config.yaml",
+    parser.add_argument('-c', '--config', type=str, default="configs/lgs_hpc_config.yaml",
                         help='Configuration file for the given simulator.')
     parser.add_argument('-t', '--app-type', type=str, default="ai",
                         help="Type of application traces to be simulated. Options are 'hpc' and 'ai'.")

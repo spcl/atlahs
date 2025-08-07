@@ -20,5 +20,8 @@ for file in ${REPORT_DIR}/*.nsys-rep; do
     file=$(basename -- "$file")
     file="${file%.*}"
     # Converts the report to sqlite
-    ( nsys export --type=sqlite --force-overwrite=true --output=${REPORT_DIR}/${file}.sqlite ${nsys_report_file} & )
+    nsys export --type=sqlite --force-overwrite=true --output=${REPORT_DIR}/${file}.sqlite ${nsys_report_file} &
 done
+# Wait for all the processes to finish
+wait
+exit 0

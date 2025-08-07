@@ -10,6 +10,8 @@ ASTRASIM_DIR = "apps/ai/astra-sim"
 HPC_GOAL_GEN_DIR = "goal_gen/hpc"
 HPC_APPS_DIR = "apps/hpc"
 
+ASTRASIM_RUN_SCRIPT = "/workspace/scripts/run_network_analytical.sh"
+
 
 # Absolute path to the parent directory 
 CURR_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -84,6 +86,10 @@ def build_astrasim(verbose: bool = True) -> None:
 
     os.chdir(CURR_DIR)
     print_success("AstraSim built successfully", verbose)
+
+    # Copies the run script to the directory in AstraSim
+    assert os.path.exists(ASTRASIM_RUN_SCRIPT), "AstraSim run script not found"
+    os.system(f"cp {ASTRASIM_RUN_SCRIPT} {ASTRASIM_DIR}/examples/network_analytical/run_network_analytical.sh")
 
 
 def build_sims(verbose: bool = True) -> None:
