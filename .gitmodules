@@ -46,3 +46,6 @@
 [submodule "apps/hpc/CloverLeaf_ref"]
 	path = apps/hpc/CloverLeaf_ref
 	url = https://github.com/UK-MAC/CloverLeaf_ref.git
+[submodule "apps/ai/vllm"]
+	path = apps/ai/vllm
+	url = https://github.com/vllm-project/vllm.git
