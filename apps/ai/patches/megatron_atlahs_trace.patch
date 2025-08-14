@@ -1,0 +1,159 @@
+diff --git a/megatron/training/training.py b/megatron/training/training.py
+index e9d29858..309f11d2 100644
+--- a/megatron/training/training.py
++++ b/megatron/training/training.py
+@@ -36,6 +36,9 @@ from megatron.legacy.model import Float16Module
+ from megatron.core.distributed import DistributedDataParallelConfig
+ from megatron.core.distributed import DistributedDataParallel as DDP
+ from megatron.core.distributed.custom_fsdp import FullyShardedDataParallel as custom_FSDP
++
++from torch.profiler import ExecutionTraceObserver
++
+ try:
+     from megatron.core.distributed import TorchFullyShardedDataParallel as torch_FSDP
+ 
+@@ -206,6 +209,20 @@ def num_floating_point_operations(args, batch_size):
+         )
+     )
+ 
++def trace_handler(prof):
++    # Get the rank of the current process
++    rank = torch.distributed.get_rank()
++    # Get the TRACE_DIR from the environment variable
++    trace_dir = os.environ.get('TRACE_DIR', None)
++    if trace_dir is None:
++        raise ValueError("TRACE_DIR environment variable is not set.")
++    # Ensure the directory exists
++    if not os.path.exists(trace_dir):
++        raise FileNotFoundError(f"Directory {trace_dir} does not exist.")
++    trace_path = os.path.join(trace_dir, f"kineto_trace_{rank}.json")
++    prof.export_chrome_trace(trace_path)
++    print(f"[DEBUG] Trace exported to {trace_path}")
++
+ 
+ def get_start_time_from_progress_log():
+     """
+@@ -1286,7 +1303,7 @@ def save_checkpoint_and_time(iteration, model, optimizer, opt_param_scheduler,
+     timers('interval-time', log_level=0).start(barrier=True)
+ 
+ 
+-def post_training_step_callbacks(model, optimizer, opt_param_scheduler, iteration, prof,
++def post_training_step_callbacks(model, optimizer, opt_param_scheduler, iteration, prof, et,
+                                  num_floating_point_operations_since_last_log_event):
+     """Run all post-training-step functions (e.g., FT heartbeats, GC)."""
+     args = get_args()
+@@ -1319,14 +1336,28 @@ def post_training_step_callbacks(model, optimizer, opt_param_scheduler, iteratio
+                                           opt_param_scheduler)
+ 
+     # Profiling.
+-    if args.profile and \
+-        iteration == args.profile_step_end and \
+-        torch.distributed.get_rank() in args.profile_ranks:
+-        if args.use_pytorch_profiler:
+-            assert prof is not None
+-            prof.stop()
+-        else:
+-            torch.cuda.cudart().cudaProfilerStop()
++    if args.use_pytorch_profiler and iteration == args.profile_step_end:
++        assert prof is not None, \
++            "PyTorch Profiler is enabled but prof is None. "
++        assert et is not None, \
++            "PyTorch Profiler is enabled but event timer (et) is None."
++
++        prof.stop()
++        et.stop()
++        et.unregister_callback()
++    
++    if args.profile and iteration == args.profile_step_end:
++        pid = os.getpid()
++        torch.cuda.nvtx.mark(f"nsys profiling stopped, pid: {pid}")
++        
++    # if args.profile and \
++    #     iteration == args.profile_step_end and \
++    #     torch.distributed.get_rank() in args.profile_ranks:
++    #     if args.use_pytorch_profiler:
++    #         assert prof is not None
++    #         prof.stop()
++    #     else:
++    #         torch.cuda.cudart().cudaProfilerStop()
+ 
+     # Manual garbage collection.
+     if args.manual_gc:
+@@ -1426,7 +1457,7 @@ def train(forward_step_func, model, optimizer, opt_param_scheduler,
+ 
+     # Tracking loss.
+     total_loss_dict = {}
+-
++    pid = os.getpid()
+     # Iterations.
+     iteration = args.iteration
+     # Make sure rerun_state_machine has the right iteration loaded from checkpoint.
+@@ -1517,16 +1548,24 @@ def train(forward_step_func, model, optimizer, opt_param_scheduler,
+             one_logger.store_set('get_e2e_base_metrics', get_e2e_base_metrics)
+ 
+     prof = None
+-    if args.profile and torch.distributed.get_rank() in args.profile_ranks and args.use_pytorch_profiler:
++    et = None
++    if args.use_pytorch_profiler:
+         prof = torch.profiler.profile(
+         schedule=torch.profiler.schedule(
+             wait=max(args.profile_step_start-1, 0),
+-            warmup=1 if args.profile_step_start > 0 else 0,
+-            active=args.profile_step_end-args.profile_step_start,
+-            repeat=1),
+-        on_trace_ready=torch.profiler.tensorboard_trace_handler(args.tensorboard_dir),
+-        record_shapes=True,
+-        with_stack=True)
++            warmup=0,
++            active=args.profile_step_end - args.profile_step_start,
++            repeat=0),
++        on_trace_ready=trace_handler)
++        et = ExecutionTraceObserver()
++        # Get the rank of the current process.
++        rank = torch.distributed.get_rank()
++        # Get the trace directory from the environment variable.
++        trace_dir = os.environ.get('TRACE_DIR', None)
++        if trace_dir is None:
++            raise ValueError("TRACE_DIR environment variable is not set.")
++        trace_file = os.path.join(trace_dir, f'pytorch_et_{rank}.json')
++        et.register_callback(trace_file)
+         prof.start()
+ 
+     start_iteration = iteration
+@@ -1549,12 +1588,21 @@ def train(forward_step_func, model, optimizer, opt_param_scheduler,
+ 
+     # Run training iterations till done.
+     while iteration < args.train_iters:
+-        if args.profile and torch.distributed.get_rank() in args.profile_ranks:
+-            if args.use_pytorch_profiler:
+-                prof.step()
+-            elif iteration == args.profile_step_start:
+-                torch.cuda.cudart().cudaProfilerStart()
+-                torch.autograd.profiler.emit_nvtx(record_shapes=True).__enter__()
++        # if args.profile and torch.distributed.get_rank() in args.profile_ranks:
++        #     if args.use_pytorch_profiler:
++        #         prof.step()
++        #     elif iteration == args.profile_step_start:
++        #         torch.cuda.cudart().cudaProfilerStart()
++        #         torch.autograd.profiler.emit_nvtx(record_shapes=True).__enter__()
++        if args.use_pytorch_profiler:
++            prof.step()
++            if iteration == args.profile_step_start:
++                et.start()
++        
++        if args.profile and iteration == args.profile_step_start:
++                # Add nvtx markers to indicate the start and end of the training step.
++                torch.cuda.nvtx.mark(f"nsys profiling start, pid: {pid}")
++
+ 
+         ft_integration.on_checkpointing_start()
+         maybe_finalize_async_save(blocking=False)
+@@ -1697,7 +1745,7 @@ def train(forward_step_func, model, optimizer, opt_param_scheduler,
+ 
+         # Miscellaneous post-training-step functions (e.g., FT heartbeats, GC).
+         # Some of these only happen at specific iterations.
+-        post_training_step_callbacks(model, optimizer, opt_param_scheduler, iteration, prof,
++        post_training_step_callbacks(model, optimizer, opt_param_scheduler, iteration, prof, et,
+                                      num_floating_point_operations_since_last_log_event)
+ 
+         # Checkpoint and decide whether to exit.

@@ -72,7 +72,9 @@ case $option in
         ;;
     esac
     ;;
-    
+  "plot")
+    python3 /workspace/scripts/plot.py -d $DATA_DIR
+    ;;
   *)
     echo "Error: Invalid option. Must be 'build' or 'run'"
     exit 1

@@ -1,0 +1,325 @@
+diff --git a/training/train_mmada_stage3.py b/training/train_mmada_stage3.py
+index 82c7af6..a834017 100644
+--- a/training/train_mmada_stage3.py
++++ b/training/train_mmada_stage3.py
+@@ -21,6 +21,7 @@ import logging
+ import math
+ import shutil
+ import time
++import datetime
+ from pathlib import Path
+ from typing import Union
+ 
+@@ -33,7 +34,7 @@ from torch.optim import AdamW
+ from lightning.pytorch.utilities import CombinedLoader
+ 
+ from transformers import AutoTokenizer, AutoConfig
+-from accelerate import Accelerator
++from accelerate import Accelerator, DistributedDataParallelKwargs, InitProcessGroupKwargs
+ from accelerate.logging import get_logger
+ from accelerate.utils import DistributedType, set_seed
+ 
+@@ -43,7 +44,7 @@ from training.imagenet_dataset import ImageNetDataset
+ from parquet import RefinedWebDataset, ChatDataset
+ 
+ from models import  MAGVITv2, get_mask_schedule, MMadaModelLM, MMadaConfig
+-from training.prompting_utils import UniversalPrompting, \
++from training.prompting_utils import UniversalPrompting
+ 
+ from models.lr_schedulers import get_scheduler
+ from models.logging import set_verbosity_info, set_verbosity_error
+@@ -77,7 +78,7 @@ def main():
+     # SETUP Accelerator     #
+     #########################
+     config = get_config()
+-
++    os.chdir("/capstor/scratch/cscs/sshen/workspace/atlahs/apps/ai/MMaDA")
+     # Enable TF32 on Ampere GPUs
+     if config.training.enable_tf32:
+         torch.backends.cuda.matmul.allow_tf32 = True
+@@ -85,12 +86,15 @@ def main():
+         torch.backends.cudnn.deterministic = False
+ 
+     config.experiment.logging_dir = str(Path(config.experiment.output_dir) / "logs")
++    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
++    init_kwargs = InitProcessGroupKwargs(timeout=datetime.timedelta(seconds=30))
+     accelerator = Accelerator(
+         gradient_accumulation_steps=config.training.gradient_accumulation_steps,
+         mixed_precision=config.training.mixed_precision,
+-        log_with="wandb",
++        log_with=None,
+         project_dir=config.experiment.logging_dir,
+         split_batches=True,
++        kwargs_handlers=[ddp_kwargs, init_kwargs],
+     )
+ 
+     total_batch_size_per_gpu = (config.training.batch_size_t2i
+@@ -310,6 +314,7 @@ def main():
+                                          num_replicas=accelerator.num_processes,
+                                          rank=accelerator.process_index,
+                                          shuffle=True,
++                                         drop_last=True,
+                                          )
+             shuffle = False
+         else:
+@@ -318,7 +323,7 @@ def main():
+ 
+         train_dataloader_t2i = DataLoader(dataset_imagenet, batch_size=config.training.batch_size_t2i,
+                                           sampler=sampler, collate_fn=dataset_imagenet.collate_fn,
+-                                          shuffle=shuffle, num_workers=dataset_config.num_workers)
++                                          shuffle=shuffle, num_workers=0)
+         num_update_steps_per_epoch = math.ceil(len(dataset_imagenet) / total_batch_size_t2i)
+         num_train_epochs = math.ceil(config.training.max_train_steps / num_update_steps_per_epoch)
+ 
+@@ -369,14 +374,14 @@ def main():
+     dataset_lm = ChatDataset(data_path=dataset_config.train_lm_shards_path_or_url,
+                                    rank=accelerator.process_index,
+                                    world_size=accelerator.num_processes,
+-                                   num_workers=dataset_config.num_workers,
++                                   num_workers=0,
+                                    max_length=preproc_config.max_seq_length,
+                                    tokenizer=uni_prompting.text_tokenizer,
+                                    )
+-
++    
+     train_dataloader_lm = torch.utils.data.DataLoader(dataset_lm, batch_size=config.training.batch_size_lm,
+                                                       sampler=None, collate_fn=dataset_lm.collate_fn,
+-                                                      num_workers=dataset_config.num_workers)
++                                                      num_workers=32)
+ 
+     # Combine these dataloaders into a single iterable model
+     iterables = {
+@@ -436,7 +441,13 @@ def main():
+ 
+     vq_model.to(device=accelerator.device)
+ 
+-    mask_dtype = model.get_input_embeddings().weight.dtype
++    # mask_dtype = model.get_input_embeddings().weight.dtype
++    mask_dtype = accelerator.unwrap_model(model).get_input_embeddings().weight.dtype
++    vocab_size = accelerator.unwrap_model(model).get_input_embeddings().weight.size(0)
++
++    def _clamp_ids(tensor):
++        """Clamp token ids so they never exceed the embedding matrix size."""
++        return tensor.clamp_(min=0, max=vocab_size - 1)
+ 
+     ##################################
+     #             Training          #
+@@ -468,6 +479,8 @@ def main():
+             seed=seed
+         )
+         input_ids, masks, labels = uni_prompting((texts, input_ids, labels), 't2i')
++        input_ids = _clamp_ids(input_ids)
++        labels    = _clamp_ids(labels)
+         return input_ids, labels, mask_prob, image_tokens, masks
+     
+     @torch.no_grad()
+@@ -509,7 +522,8 @@ def main():
+         masked_indices = noisy_batch == mask_id 
+         answer_lengths_lm = torch.sum((1 - prompt_mask), dim=-1, keepdim=True)
+         answer_lengths_lm = answer_lengths_lm.repeat(1, noisy_batch.shape[1])
+-        
++        noisy_batch = _clamp_ids(noisy_batch)
++        labels_lm   = _clamp_ids(labels_lm)
+         return noisy_batch, labels_lm, p_mask, answer_lengths_lm
+     
+     @torch.no_grad()
+@@ -531,7 +545,8 @@ def main():
+         prompt_masks = prompt_masks.to(torch.int64)    
+         answer_lengths = torch.sum((1 - prompt_masks), dim=-1, keepdim=True)
+         answer_lengths = answer_lengths.repeat(1, noisy_batch.shape[1])    
+-
++        noisy_batch = _clamp_ids(noisy_batch)
++        labels_mmu  = _clamp_ids(labels_mmu)
+         return noisy_batch, labels_mmu, p_mask, answer_lengths
+ 
+ 
+@@ -539,10 +554,20 @@ def main():
+     batch_time_m = AverageMeter()
+     data_time_m = AverageMeter()
+     end = time.time()
+-
++    trace_start = 10
++    trace_duration = 2
+     for epoch in range(first_epoch, num_train_epochs):
+         model.train()
++        print("[DEBUG] Epoch: ", epoch, flush=True)
+         for batch, batch_idx, dataloader_idx in combined_dataloader:
++            if global_step == trace_start:
++                print("[DEBUG] Tracing started", flush=True)
++                torch.cuda.nvtx.mark(f"nsys profiling start, pid: {os.getpid()}")
++            if global_step == trace_start + trace_duration:
++                print("[DEBUG] Tracing stopped", flush=True)
++                torch.cuda.nvtx.mark(f"nsys profiling stopped, pid: {os.getpid()}")
++            
++            print("[DEBUG] Batch: ", batch_idx, "Dataloader: ", dataloader_idx, flush=True)
+             # for loss calculation
+             batch_size_t2i = batch["t2i_flow"]["images"].shape[0]
+             batch_size_lm = len(batch["lm_flow"]["input_ids"])
+@@ -631,6 +656,12 @@ def main():
+                 logger.info("Input ids: {}".format(input_ids))
+                 logger.info("Labels: {}".format(labels))
+ 
++            vocab_size = model.get_input_embeddings().weight.size(0)
++            max_id     = input_ids.max().item()
++            min_id     = input_ids.min().item()
++            if max_id >= vocab_size or min_id < 0:
++                raise ValueError(f"bad token id {min_id} … {max_id} (vocab={vocab_size})")
++
+             with accelerator.accumulate(model):
+                 logits, loss_t2i, loss_lm, loss_mmu = model.forward_process(
+                     input_ids=input_ids,
+@@ -645,23 +676,33 @@ def main():
+                     t2i_masks=t2i_masks,
+                     answer_lengths_lm=answer_lengths_lm
+                 )
++
++                print("[DEBUG] Losses: ", loss_t2i.item(), loss_lm.item(), loss_mmu.item(), flush=True)
+                 # Gather the losses across all processes for logging (if we use distributed training).
+                 avg_loss_t2i = accelerator.gather(loss_t2i.repeat(config.training.batch_size_t2i)).mean()
+                 avg_loss_lm = accelerator.gather(loss_lm.repeat(config.training.batch_size_lm)).mean()
+                 avg_loss_mmu = accelerator.gather(loss_mmu.repeat(config.training.batch_size_mmu)).mean()
++                # avg_loss_t2i = accelerator.reduce(loss_t2i, reduction="mean")
++                # print("[DEBUG] Loss t2i reduced", flush=True)
++                # avg_loss_lm  = accelerator.reduce(loss_lm,  reduction="mean")
++                # avg_loss_mmu = accelerator.reduce(loss_mmu, reduction="mean")
+                 loss = config.training.t2i_coeff * loss_t2i + \
+                        config.training.lm_coeff * loss_lm + \
+                        config.training.mmu_coeff * loss_mmu
++                print(f"[DEBUG] Loss: {loss.item()}", flush=True)
+ 
+                 avg_masking_rate = accelerator.gather(mask_prob.repeat(config.training.batch_size_t2i)).mean()
+ 
+                 accelerator.backward(loss)
++                # loss.backward()
++                # print("[DEBUG] Backward pass done", flush=True)
+ 
+                 if config.training.max_grad_norm is not None and accelerator.sync_gradients:
+                     accelerator.clip_grad_norm_(model.parameters(), config.training.max_grad_norm)
+ 
+                 optimizer.step()
+                 lr_scheduler.step()
++                # print("[DEBUG] Optimizer step done", flush=True)
+ 
+                 # log gradient norm before zeroing it
+                 if (
+@@ -672,6 +713,8 @@ def main():
+                     log_grad_norm(model, accelerator, global_step + 1)
+ 
+                 optimizer.zero_grad(set_to_none=True)
++                # print("[DEBUG] Optimizer step done", flush=True)
++
+             # Checks if the accelerator has performed an optimization step behind the scenes
+             if accelerator.sync_gradients:
+ 
+@@ -712,59 +755,59 @@ def main():
+                 if (global_step + 1) % config.experiment.save_every == 0:
+                     save_checkpoint(model, config, accelerator, global_step + 1, uni_prompting)
+ 
+-                if ((global_step + 1) % config.experiment.generate_every == 0 or global_step == start_step) and accelerator.is_main_process:
+-                    generate_images(
+-                        model,
+-                        vq_model,
+-                        uni_prompting,
+-                        accelerator,
+-                        config,
+-                        global_step + 1,
+-                        mask_schedule=mask_schedule,
+-                        force_no_cfg=False
+-                    )
+-
+-                    generate_images(
+-                        model,
+-                        vq_model,
+-                        uni_prompting,
+-                        accelerator,
+-                        config,
+-                        global_step + 1,
+-                        mask_schedule=mask_schedule,
+-                        force_no_cfg=True
+-                    )
+-
+-                    visualize_predictions(
+-                        model,
+-                        vq_model,
+-                        uni_prompting,
+-                        config,
+-                        global_step + 1,
+-                        input_ids,
+-                        image_tokens_ori,
+-                        batch["t2i_flow"]["images"],
+-                        texts,
+-                        logits,
+-                        accelerator
+-                    )
++                # if ((global_step + 1) % config.experiment.generate_every == 0 or global_step == start_step) and accelerator.is_main_process:
++                #     generate_images(
++                #         model,
++                #         vq_model,
++                #         uni_prompting,
++                #         accelerator,
++                #         config,
++                #         global_step + 1,
++                #         mask_schedule=mask_schedule,
++                #         force_no_cfg=False
++                #     )
++
++                #     generate_images(
++                #         model,
++                #         vq_model,
++                #         uni_prompting,
++                #         accelerator,
++                #         config,
++                #         global_step + 1,
++                #         mask_schedule=mask_schedule,
++                #         force_no_cfg=True
++                #     )
++
++                #     visualize_predictions(
++                #         model,
++                #         vq_model,
++                #         uni_prompting,
++                #         config,
++                #         global_step + 1,
++                #         input_ids,
++                #         image_tokens_ori,
++                #         batch["t2i_flow"]["images"],
++                #         texts,
++                #         logits,
++                #         accelerator
++                #     )
+                     
+-                    understanding_images(
+-                        model,
+-                        vq_model,
+-                        uni_prompting,
+-                        accelerator,
+-                        config,
+-                        global_step + 1,
+-                    )
+-
+-                    generate_chat_text(
+-                        model,
+-                        uni_prompting,
+-                        accelerator,
+-                        config,
+-                        global_step + 1,
+-                    )
++                #     understanding_images(
++                #         model,
++                #         vq_model,
++                #         uni_prompting,
++                #         accelerator,
++                #         config,
++                #         global_step + 1,
++                #     )
++
++                #     generate_chat_text(
++                #         model,
++                #         uni_prompting,
++                #         accelerator,
++                #         config,
++                #         global_step + 1,
++                #     )
+ 
+                 global_step += 1
+             # Stop training if max steps is reached
