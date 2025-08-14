@@ -7,7 +7,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Union
 
 # Path to the schedgen executable
 SCHEDGEN_EXEC_PATH = "/workspace/goal_gen/hpc/Schedgen/schedgen"
@@ -152,7 +152,8 @@ def run_lgs_simulator(bin_file: str, sim_config: str, exec: str, verbose: bool) 
     return pred_runtime
 
 
-def run_astrasim_simulator(workload_dir: str, network_config: str, exec: str, verbose: bool) -> int:
+def run_astrasim_simulator(workload_dir: str, network_config: str, exec: str, verbose: bool) \
+    -> Union[int, str]:
     """
     Run the AstraSim simulator for the given binary file and configuration file.
     @return: The predicted runtime of the application in ns.
@@ -183,7 +184,11 @@ def run_astrasim_simulator(workload_dir: str, network_config: str, exec: str, ve
     # assert os.system(cmd) == 0, f"Error running the AstraSim simulator."
     process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = process.communicate()
-    assert process.returncode == 0, f"Error running the AstraSim simulator: {err.decode()}"
+    if process.returncode != 0:
+        # If an error occurs, return the string "Error"
+        print_error(f"Error running the AstraSim simulator: {err.decode()}", verbose)
+        return "Error"
+    # assert process.returncode == 0, f"Error running the AstraSim simulator: {err.decode()}"
     # Iterates through the output and find the pattern "finished, (\d+) cycles",
     # and returns the maximum number of cycles found in the output
     pattern = r"finished, (\d+) cycle"
@@ -196,7 +201,7 @@ def run_astrasim_simulator(workload_dir: str, network_config: str, exec: str, ve
 
 def run_validation_exp_for_workload(workload_dir: str, result_dir: str, simulator: str,
                                     sim_config: str, exec: str, app_type: str,
-                                    verbose: bool) -> int:
+                                    verbose: bool) -> Union[int, str]:
     """
     Run the validation experiment for the given workload directory and store the results
     in the result directory.
