@@ -195,6 +195,8 @@
  
    std::vector< std::vector<btime_t> > rq_times(0);
    std::vector< std::vector<btime_t> > uq_times(0); 
+
+   std::vector<int> message_sizes;
  
    // Data structure for keeping track of communication dependencies
    // Stores a vector of tuples each containing four elements:
@@ -355,9 +357,10 @@
              // check if OS Noise occurred
              btime_t noise = osnoise.get_noise(elem.host, elem.time, elem.time+o);
              uint64_t cpu_time = elem.time + o + noise + (elem.size-1) * O;
-             //printf("Time %lu vs o %lu vs g %lu vs noise %lu vs %lu\n", elem.time, o, g, noise, (elem.size-1) * O);
              // nexto[elem.host][elem.proc] = elem.time + o + (elem.size-1)*O+ noise;
              nexto[elem.host][elem.proc] = cpu_time;
+
+             message_sizes.push_back(elem.size);
              
              // std::cout << "[DEBUG] HOST: " << elem.host << " Send offset: " << elem.offset << " cpu: " << unsigned(elem.proc) << " Time: " << elem.time / 1e9 << " Size (b): " << elem.size << " NextO: " << nexto[elem.host][elem.proc] / 1e9 << std::endl;
              uint64_t bandwidth_cost = static_cast<uint64_t>((elem.size-1) * G);
@@ -808,6 +811,19 @@
  #endif
    printf("PERFORMANCE: Processes: %i \t Events: %lu \t Time: %lu s \t Speed: %.2f ev/s\n", p, (long unsigned int)aqtime, (long unsigned int)diff, (float)aqtime/(float)diff);
  
+
+  std::vector<double> avg_fcts;
+  for (int i = 0; i < message_sizes.size(); ++i) {
+    avg_fcts.push_back((double)message_sizes[i] * 8 / 200);
+  }
+
+  double accumulate = 0;
+  for (int i = 0; i < avg_fcts.size(); ++i) {
+    accumulate += avg_fcts[i];
+  }
+
+  printf("Average FCT is %f\n", accumulate / avg_fcts.size());
+
    // check if all queues are empty!!
    bool ok=true;
    for(uint i=0; i<p; ++i) {

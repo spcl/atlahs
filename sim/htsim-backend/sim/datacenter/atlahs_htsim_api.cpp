@@ -5,6 +5,7 @@
 #include "logsim-interface.h"
 #include "../lgs/LogGOPSim.hpp"
     
+bool AtlahsHtsimApi::llama_rand = false;
 
 void AtlahsHtsimApi::Send(const SendEvent &event, graph_node_properties elem) {
     //std::cout << "AtlahsHtsimApi: Sending event" << std::endl;
@@ -20,8 +21,14 @@ void AtlahsHtsimApi::Send(const SendEvent &event, graph_node_properties elem) {
         to = getHtsimNodeNumber(to, elem.nic);
     }
 
-    simtime_picosec flow_duration = size * 8 / 200 * 1000;
-
+    // Temporary solution
+    if (llama_rand) {
+        if (from >= 4) {
+            from = from + 12;
+            to = to + 12;
+        }
+    }
+    
     if (from == to) {
         std::cerr << "Error: Send event from and to the same node" << std::endl;
         exit(0);

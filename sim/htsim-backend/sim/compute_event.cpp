@@ -33,4 +33,7 @@ void ComputeEvent::setCompute(simtime_picosec computation_time) {
     // eventlist().doNextEvent();
 }
 
-void ComputeEvent::startComputations() { eventlist().doNextEvent(); }
+void ComputeEvent::startComputations() { 
+    printf("ComputeEvent::startComputations at %lu ps\n", eventlist().now());
+    eventlist().doNextEvent(); 
+}

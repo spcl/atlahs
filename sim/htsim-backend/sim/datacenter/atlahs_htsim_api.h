@@ -129,6 +129,7 @@ public:
     bool send_done_return_control = false; // TO DO
     std::vector<FlowInfo> flowInfos;
     bool print_stats_flows = false;
+    bool static llama_rand;
     
 private:
     EventList* _eventlist = nullptr;

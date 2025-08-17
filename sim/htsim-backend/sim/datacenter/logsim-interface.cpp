@@ -209,7 +209,7 @@ void LogSimInterface::terminate_sim() {
 
 void LogSimInterface::htsim_simulate_until(int64_t until) {
 
-    // /printf("Running HTSIM Simulate Until %lu - HtSime Time is %lu\n", until, htsim_api->getGlobalTimeNs());
+    //printf("Running HTSIM Simulate Until %lu - HtSime Time is %lu\n", until, htsim_api->getGlobalTimeNs());
 
     if (until != -1) {
       compute_started++;
@@ -217,6 +217,8 @@ void LogSimInterface::htsim_simulate_until(int64_t until) {
     }
 
     have_more = false;
+
+    //printf("Size eventlist is %lu\n", _eventlist->getPendingSources().size());
 
     while (_eventlist->doNextEvent()) {
 
@@ -229,6 +231,7 @@ void LogSimInterface::htsim_simulate_until(int64_t until) {
             break;
         }
 
+        //printf("While3 - Time is %lu - Have More %d\n", _eventlist->now(), have_more);
         if (_latest_recv->updated) {
           this->reset_latest_receive();
           if (_eventlist->now() == _eventlist->getPendingSources().begin()->first) {
@@ -1019,7 +1022,7 @@ int start_lgs(std::string filename_goal, LogSimInterface &lgs) {
     }
     
     if (ok) {
-      if(p <= 16 && !batchmode_given) { // print all hosts
+      if(p <= 128 && !batchmode_given) { // print all hosts
         printf("Times: \n");
         host = 0;
         for(uint i=0; i<p; ++i) {

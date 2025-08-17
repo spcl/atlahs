@@ -1,5 +1,5 @@
-Nodes 16
-Connections 15
+Nodes 64
+Connections 8
 0->15 start 0 size 2000000
 1->15 start 0 size 2000000
 2->15 start 0 size 2000000
@@ -8,10 +8,3 @@ Connections 15
 5->15 start 0 size 2000000
 6->15 start 0 size 2000000
 7->15 start 0 size 2000000
-8->15 start 0 size 2000000
-9->15 start 0 size 2000000
-10->15 start 0 size 2000000
-11->15 start 0 size 2000000
-12->15 start 0 size 2000000
-13->15 start 0 size 2000000
-14->15 start 0 size 2000000

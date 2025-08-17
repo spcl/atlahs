@@ -627,6 +627,11 @@ int main(int argc, char **argv) {
         queuesize = bdp_local * queue_size_ratio;
     }
 
+    if (goal_filename.find("llama_random.bin") != std::string::npos) {
+        printf("Setting LLama random\n");
+        AtlahsHtsimApi::llama_rand = true;
+    }
+
     if (explicit_starting_buffer != 0) {
         queuesize = explicit_starting_buffer;
     }
