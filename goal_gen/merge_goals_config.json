@@ -1,9 +1,9 @@
 {
     "mode": "multi-job",
     "goal_files": [
-        "goal_gen/tmp1.goal",
-        "goal_gen/tmp2.goal"
+        "InterNode_MicroEvents_Dependency.goal",
+        "lulesh_slimfly_8.goal"
     ],
-    "pattern": "packed",
-    "share-nic": true
+    "pattern": "custom",
+    "share-nic": false
 }

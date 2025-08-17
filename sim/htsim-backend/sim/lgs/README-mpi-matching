@@ -1,0 +1,104 @@
+Collecting MPI Matching Data
+============================
+
+Overview
+--------
+MPI matching is the process of matching incoming messages to receive requests (e.g., due to MPI
+operations like MPI_Recv).  This process occurs for both point-to-point messages and collecive
+operations.  Common MPI implementations may treat collective operations differently than
+point-to-point operations but, because LogGOPSim decomposes collective operations into sequences of
+point-to-point messages, LogGOPSim uses the same matching process for collective operations and
+point-to-point messages.  
+
+An incoming message and a receive request are a match when the source and tag of the incoming
+message and the receive request match.  This process is complicated by MPI's `no-overtaking` rule
+and the existence of wildcard values (e.g., MPI_ANY_SOURCE and MPI_ANY_TAG).
+
+In order to simulate MPI application, LogGOPSim must accurately model how messages are matched.
+LogGOPSim matches messsages and receive requests using two queues: a posted receive queue (RQ) and a
+unexpected messsage queue (UQ).  When the application makes a receive request (directly via a
+point-to-point operation or indirectly via a collectively operation), the UQ is searched to
+determine whether a message that satisfies the request has already been received.  It not, the
+request is appended to the end of the RQ.  Similarly, when a message arrives, the RQ is searched to
+determine whether it matches an existing receive request.  If not, the message is appended to the
+end of the UQ.
+
+Matching Statistics
+-------------------
+LogGOPSim allows the user to collect statistics about the process of MPI message matching for the
+applications that it simulates.  A key benefit of using LogGOPSim to collect this information is
+that the collection of this data can be done without competing with the application under test for
+either memory/storage resources or CPU cycles (i.e., data collection occurs without the passage of
+simulated time).  When the collection of matching statistics is enabled (i.e., using "-qstat
+<prefix>"), LogGOPSim will produce the following set of files:
+
+* <prefix>-rq-max.data  : this file contains one line per rank, each line contains the maximum 
+                          number of elements observed in the RQ
+
+* <prefix>-rq-hit.data  : this file contains one line per rank, each line contains list of
+                          space-separated pairs.  Each pair has the form: 
+
+                            <hit depth>,<simulated time>  
+
+                          Each successful search of the RQ results in the creation of a new pair
+                          (i.e., the number of pairs for a given rank corresponds to the number of
+                          successful searches, i.e., hits, of the RQ).  The value of <hit depth>
+                          represents how many elements were searched before a match was found.  The
+                          value of <simulated time> represents the point in simulated time (in
+                          nanoseconds since the start of the simulation) at which the search
+                          occurred.
+
+* <prefix>-rq-miss.data : this file contains one line per rank, each line contains list of
+                          space-separated pairs.  Each pair has the form: 
+
+                            <queue depth>,<simulated time>
+      
+                          Each unsuccessful search of the RQ results in the creation of a new pair
+                          (i.e., the number of pairs for a given rank corresponds to the number of
+                          unsuccessful searches, i.e., misses, of the RQ).  The value of 
+                          <queue depth> represents the size of the RQ when the search failed, i.e.,
+                          how many elements were searched trying to find a match.  The value of 
+                          <simulated time> represents the point in simulated time (in nanoseconds
+                          since the start of the simulation) at which the search occurred.
+
+* <prefix>-uq-max.data  : this file contains one line per rank, each line contains the maximum 
+                          number of elements observed in the UQ
+
+* <prefix>-uq-hit.data  : this file contains one line per rank, each line contains list of
+                          space-separated pairs.  Each pair has the form: 
+
+                            <hit depth>,<simulated time>
+      
+                          Each successful search of the UQ results in the creation of a new pair
+                          (i.e., the number of pairs for a given rank corresponds to the number of
+                          successful searches, i.e., hits, of the UQ).  The value of <hit depth>
+                          represents how many elements were searched before a match was found.  The
+                          value of <simulated time> represents the point in simulated time (in
+                          nanoseconds since the start of the simulation) at which the search occurred.
+
+* <prefix>-uq-miss.data : this file contains one line per rank, each line contains list of
+                          space-separated pairs.  Each pair has the form: 
+
+                            <queue depth>,<simulated time>
+
+                          Each unsuccessful search of the UQ results in the creation of a new pair
+                          (i.e., the number of pairs for a given rank corresponds to the number of
+                          unsuccessful searches, i.e., misses, of the UQ).  The value of 
+                          <queue depth> represents the size of the RQ when the search failed, i.e.,
+                          how many elements were searched trying to find a match.  The value of
+                          <simulated time> represents the point in simulated time (in nanoseconds
+                          since the start of the simulation) at which the search occurred.
+
+Example
+-------
+For an example of the data that can be collected using this option, see:
+
+Ferreira, Levy, Pedretti and Grant.  "Characterizing MPI matching via trace-based simulation",
+Parallel Computing, volume 77, pages 57-83 (2018).
+
+Questions
+---------
+Questions regarding this feature may be directed to: 
+
+Scott Levy (sllevy@sandia.gov)
+Kurt Ferreira (kbferre@sandia.gov)

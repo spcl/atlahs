@@ -1,0 +1,12 @@
+{
+    "mode": "multi-job",
+    "goal_files": [
+      "InterNode_MicroEvents_Dependency.goal",
+      "lulesh_slimfly_8.goal"
+    ],
+    "pattern": [
+      [0, 1, 20, 30],
+      [8, 9, 10, 11, 12, 13, 14, 26]
+    ],
+    "share-nic": false
+  }

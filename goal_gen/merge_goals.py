@@ -4,8 +4,6 @@ import json
 import random
 import re
 from tqdm import tqdm
-
-
 from typing import List, Dict, Optional, Tuple, Union, TextIO
 
 # ===============================================
@@ -13,47 +11,28 @@ from typing import List, Dict, Optional, Tuple, Union, TextIO
 # ===============================================
 
 def print_warning(message: str, verbose: bool = True, flush: bool = True) -> None:
-    """
-    Prints a warning message in color orange.
-    """
     if verbose:
         CSTART = '\033[93m'
         CEND = '\033[0m'
         print(f"{CSTART}[WARNING] {message}{CEND}", flush=flush)
 
-
 def print_error(message: str, verbose: bool = True, flush: bool = True) -> None:
-    """
-    Prints an error message in color red.
-    """
     if verbose:
         CSTART = '\033[91m'
         CEND = '\033[0m'
         print(f"{CSTART}[ERROR] {message}{CEND}", flush=flush)
 
-
 def print_success(message: str, verbose: bool = True, flush: bool = True) -> None:
-    """
-    Prints a success message in color green.
-    """
     if verbose:
         CSTART = '\033[92m'
         CEND = '\033[0m'
         print(f"{CSTART}[SUCCESS] {message}{CEND}", flush=flush)
 
-
 def print_info(message: str, verbose: bool = True, flush: bool = True) -> None:
-    """
-    Prints an information message in color blue.
-    """
     if verbose:
         print(f"[INFO] {message}", flush=flush)
 
-
 def get_config(config_path: str) -> Dict:
-    """
-    Load the configuration file.
-    """
     if not os.path.exists(config_path):
         print_error(f"Configuration file '{config_path}' does not exist.")
         exit(1)
@@ -61,53 +40,42 @@ def get_config(config_path: str) -> Dict:
         config = json.load(f)
     return config
 
+# ===============================================
+# Mapping functions
+# ===============================================
 
-
-def get_packed_mapping(mode: str, job_ranks: List[int],
-                       verbose: bool) -> List[List[int]]:
-    """
-    Generates a packed mapping of ranks to nodes in the cluster.
-    FIXME: Written for the sake of clarity not for brevity.
-    """
+def get_packed_mapping(mode: str, job_ranks: List[int], verbose: bool) -> List[List[int]]:
     print_info("Generating packed mapping...", verbose)
     total_ranks = sum(job_ranks)
     if mode == "multi-job":
         res = []
         start = 0
-        for num_ranks in job_ranks:
-            res.append(list(range(start, start + num_ranks)))
-            start += num_ranks
+        for num in job_ranks:
+            res.append(list(range(start, start + num)))
+            start += num
         return res
     elif mode == "multi-tenant":
         res = []
-        for num_ranks in job_ranks:
-            res.append(list(range(num_ranks)))
+        for num in job_ranks:
+            res.append(list(range(num)))
         return res
     else:
         print_error(f"Invalid mode: {mode}")
         exit(1)
 
-
-def get_round_robin_mapping(mode: str, job_ranks: List[int],
-                            verbose: bool) -> List[List[int]]:
-    """
-    Generates a round-robin mapping of ranks to nodes in the cluster.
-    """
+def get_round_robin_mapping(mode: str, job_ranks: List[int], verbose: bool) -> List[List[int]]:
     print_info("Generating round-robin mapping...", verbose)
     if mode == "multi-job":
-        # FIXME Not very efficient but it works
         num_jobs = len(job_ranks)
         total_ranks = sum(job_ranks)
         res = [[] for _ in range(num_jobs)]
         next_job = 0
         i = 0
-        # Emulates the round-robin placement the hard way
-        while i < total_ranks: 
+        while i < total_ranks:
             if len(res[next_job]) < job_ranks[next_job]:
                 res[next_job].append(i)
                 i += 1
             next_job = (next_job + 1) % num_jobs
-        
         assert max([max(x) for x in res]) == total_ranks - 1, f"Invalid round-robin mapping: {res}"
         assert sum([len(x) for x in res]) == total_ranks, f"Invalid round-robin mapping: {res}"
         return res
@@ -118,12 +86,7 @@ def get_round_robin_mapping(mode: str, job_ranks: List[int],
         print_error(f"Invalid mode: {mode}")
         exit(1)
 
-
-
 def get_random_mapping(mode: str, job_ranks: List[int], verbose: bool) -> List[List[int]]:
-    """
-    Generates a random mapping of ranks to nodes in the cluster.
-    """
     print_info("Generating random mapping...", verbose)
     if mode == "multi-job":
         total_ranks = sum(job_ranks)
@@ -131,103 +94,74 @@ def get_random_mapping(mode: str, job_ranks: List[int], verbose: bool) -> List[L
         random.shuffle(tmp)
         res = []
         start = 0
-        for num_ranks in job_ranks:
-            res.append(tmp[start:start + num_ranks])
-            start += num_ranks
+        for num in job_ranks:
+            res.append(tmp[start:start + num])
+            start += num
         return res
     elif mode == "multi-tenant":
         max_nodes = max(job_ranks)
         res = []
-        for num_ranks in job_ranks:
-            res.append(random.sample(range(max_nodes), num_ranks))
-        
+        for num in job_ranks:
+            res.append(random.sample(range(max_nodes), num))
         return res
     else:
         print_error(f"Invalid mode: {mode}")
         exit(1)
 
-
-def verify_custom_pattern(mode: str, job_ranks: List[int], pattern: List[List[int]],
-                          verbose: bool) -> bool:
-    """
-    Verifies that the custom pattern is valid.
-    """
+def verify_custom_pattern(mode: str, job_ranks: List[int], pattern: List[List[int]], verbose: bool) -> bool:
     if mode == "multi-job":
-        total_ranks = sum(job_ranks)
-        ranks = set()
+        # In custom mode we expect each inner list length to match the expected number of ranks.
         for i, rank_list in enumerate(pattern):
             if len(rank_list) != job_ranks[i]:
-                print_warning(f"Number of ranks for job {i} does not match the expected value {job_ranks[i]}", verbose)
+                print_warning(f"Job {i} pattern length {len(rank_list)} does not match expected {job_ranks[i]}", verbose)
                 return False
             for rank in rank_list:
-                if rank in ranks:
-                    print_warning(f"Rank {rank} is duplicated.", verbose)
+                if rank < 0:
+                    print_warning(f"Rank {rank} is negative in job {i}", verbose)
                     return False
-                if rank < 0 or rank >= total_ranks:
-                    print_warning(f"Rank {rank} is out of range.", verbose)
-                    return False
-                ranks.add(rank)
-        if len(ranks) != total_ranks:
-            print_warning("Some ranks are missing.", verbose)
-            return False
         return True
     elif mode == "multi-tenant":
         max_nodes = max(job_ranks)
-        ranks = set()
         for i, rank_list in enumerate(pattern):
             if len(rank_list) != job_ranks[i]:
-                print_warning(f"Number of ranks for job {i} does not match the expected value {job_ranks[i]}.", verbose)
+                print_warning(f"Job {i} pattern length {len(rank_list)} does not match expected {job_ranks[i]}", verbose)
                 return False
             for rank in rank_list:
                 if rank < 0 or rank >= max_nodes:
-                    print_warning(f"Rank {rank} is out of range.", verbose)
+                    print_warning(f"Rank {rank} is out of range in job {i}", verbose)
                     return False
-                ranks.add(rank)
         return True
     else:
         print_error(f"Invalid mode: {mode}")
         exit(1)
 
-
-def rank_mapping_to_job_ranks(rank_mapping: List[List[int]]) -> Dict[int, Tuple[int, int]]:
+def rank_mapping_to_job_ranks(rank_mapping: List[List[int]]) -> Dict[int, Tuple[int,int]]:
     """
-    Converts the given rank mapping to a dictionary of tuples where the tuple
-    at key i contains the job index and the rank index in the job.
-    Only works for multi-job mode.
+    Converts the custom mapping to a dictionary mapping global rank -> (job index, rank index in that job).
+    For example, with pattern [[0,3,20,30], [4,5,6,7,8,9,10,11]] the dictionary will contain:
+      0 -> (0,0), 3 -> (0,1), 20 -> (0,2), 30 -> (0,3)
+      4 -> (1,0), 5 -> (1,1), etc.
     """
     res = {}
-    for job, mapped_ranks in enumerate(rank_mapping):
-        for i, rank in enumerate(mapped_ranks):
-            res[rank] = (job, i)
+    for job, mapped in enumerate(rank_mapping):
+        for idx, global_rank in enumerate(mapped):
+            if global_rank in res:
+                print_warning(f"Global rank {global_rank} is assigned more than once.", True)
+                exit(1)
+            res[global_rank] = (job, idx)
     return res
-
 
 def rank_remap_for_job(rank_mapping: List[List[int]]) -> List[List[int]]:
     """
-    Remaps the ranks in all jobs in order to determine the sending and
-    receiving ranks in the new GOAL file. Returns a list of lists where
-    each list contains the new ranks for a job. Index i in the list
-    corresponds to the rank in the old GOAL file, and the value at
-    index i is the new rank in the new GOAL file.
+    For custom mapping we simply return the mapping as provided.
     """
-    res = []
-    for ranks in rank_mapping:
-        job_rank_remap = []
-        for rank in ranks:
-            job_rank_remap.append(rank)
-        res.append(job_rank_remap)
-    return res
+    return rank_mapping
 
+# ===============================================
+# GOAL file processing functions
+# ===============================================
 
-def get_rank_pos_in_goal_files(goal_files: List[str], rank_mapping: List[List[int]]) \
-    -> List[List[int]]:
-    """
-    Get the position of the start of each rank in the each of
-    the goal files. Returns a list of lists where the index i of each
-    list corresponds to the position of the rank i in the GOAL file.
-    This is done so that we can easily extract the rank schedules
-    from the GOAL files without having to traverse them multiple times.
-    """
+def get_rank_pos_in_goal_files(goal_files: List[str], rank_mapping: List[List[int]]) -> List[List[int]]:
     res = []
     for i, goal_file in enumerate(goal_files):
         f = open(goal_file, "r")
@@ -238,29 +172,18 @@ def get_rank_pos_in_goal_files(goal_files: List[str], rank_mapping: List[List[in
                 break
             if line.startswith("rank"):
                 rank_pos.append(f.tell())
-        assert len(rank_pos) == len(rank_mapping[i]), \
-            f"Number of ranks does not match in '{goal_file}'."
+        # Expect number of rank blocks equal to the pattern count for that job.
+        assert len(rank_pos) == len(rank_mapping[i]), f"Number of ranks does not match in '{goal_file}'."
         f.close()
         res.append(rank_pos)
     return res
 
-
-# ===============================================
-# Main functions
-# ===============================================
-
 def load_number_of_ranks(goal_files: List[str], verbose: bool) -> List[int]:
-    """
-    Load the number of ranks and the list of ranks from the goal files.
-    The number of ranks can be read directly from the first line
-    of the goal file. It is in the format of "num_ranks <number>".
-    """
     ranks = []
     for goal_file in goal_files:
         if not os.path.exists(goal_file):
             print_error(f"Goal file '{goal_file}' does not exist.")
             exit(1)
-        
         with open(goal_file, "r") as f:
             num_ranks = None
             for line in f:
@@ -270,25 +193,11 @@ def load_number_of_ranks(goal_files: List[str], verbose: bool) -> List[int]:
             if num_ranks is None:
                 print_error(f"Number of ranks not found in '{goal_file}'.")
                 exit(1)
-
             ranks.append(num_ranks)
-            
             print_info(f"Number of ranks in '{goal_file}': {num_ranks}", verbose)
-    
     return ranks
 
-
-def get_rank_mapping(mode: str, job_ranks: List[int], pattern: Union[List, str],
-                     verbose: bool) -> List[List[int]]:
-    """
-    Generates a mapping of ranks to nodes in the cluster based on the given mode and pattern.
-    Note that if the specified pattern is a string, it can be one of the following:
-    - "packed"
-    - "round_robin"
-    - "random"
-    If it is a list, then this function serves as a verification step to ensure that
-    the given custom pattern is valid.
-    """
+def get_rank_mapping(mode: str, job_ranks: List[int], pattern: Union[List, str], verbose: bool) -> List[List[int]]:
     assert mode in ("multi-job", "multi-tenant"), f"Invalid mode: {mode}"
     if isinstance(pattern, str):
         if pattern == "packed":
@@ -311,13 +220,7 @@ def get_rank_mapping(mode: str, job_ranks: List[int], pattern: Union[List, str],
         print_error(f"Invalid pattern: {pattern}")
         exit(1)
 
-
-
-def write_rank_sched_to_output(out: TextIO, rank: int, rank_remap: List[List[int]],
-                               rank_pos: List[int], goal_file_path: str) -> None:
-    """
-    Writes the rank schedule to the output file.
-    """
+def write_rank_sched_to_output(out: TextIO, rank: int, rank_remap: List[int], rank_pos: List[int], goal_file_path: str) -> None:
     goal_file = open(goal_file_path, "r")
     goal_file.seek(rank_pos[rank])
     while True:
@@ -327,69 +230,53 @@ def write_rank_sched_to_output(out: TextIO, rank: int, rank_remap: List[List[int
         tokens = line.split()
         if len(tokens) == 0:
             continue
-        
         if tokens[1] == "send":
             assert len(tokens) >= 7, f"Invalid send operation: {line}"
-            # Try to replace the destination rank in a operation
-            # with the following format as per the remapping
-            # l<op_id>: send <size>b to <dst> tag <tag> cpu <cpu> nic <nic>
             remapped_dst = rank_remap[int(tokens[4])]
             prefix = " ".join(tokens[:4])
             suffix = " ".join(tokens[5:])
             out.write(f"{prefix} {remapped_dst} {suffix}\n")
         elif tokens[1] == "recv":
             assert len(tokens) >= 7, f"Invalid recv operation: {line}"
-            # Try to replace the source rank in a operation
-            # with the following format as per the remapping
-            # l<op_id>: recv <size>b from <src> tag <tag> cpu <cpu> nic <nic>
             remapped_src = rank_remap[int(tokens[4])]
             prefix = " ".join(tokens[:4])
             suffix = " ".join(tokens[5:])
             out.write(f"{prefix} {remapped_src} {suffix}\n")
         else:
             out.write(line)
+    goal_file.close()
 
+# ===============================================
+# Main functions
+# ===============================================
 
-def generate_multi_job_goal(goal_files: List[str], rank_mapping: List[List[int]],
-                            output_file: str, verbose: bool) -> None:
-    """
-    Generates a multi-job goal file based on the given rank mapping as well
-    as the list of goal files.
-    """
+def generate_multi_job_goal(goal_files: List[str], rank_mapping: List[List[int]], output_file: str, verbose: bool) -> None:
     print_info(f"Generating multi-job goal file: {output_file}...", verbose)
-
-    job_ranks = rank_mapping_to_job_ranks(rank_mapping)
-
-    rank_remap = rank_remap_for_job(rank_mapping)
-    print("job_ranks", job_ranks)
-    rank_pos = get_rank_pos_in_goal_files(goal_files, rank_mapping)
-    print_info(f"Obtained the positions of ranks in the GOAL files.", verbose)
-
-    total_ranks = sum([len(x) for x in rank_mapping])
+    # Build dictionary: global rank -> (job index, rank index in that job)
+    global_map = rank_mapping_to_job_ranks(rank_mapping)
+    # Total global ranks is max(global rank) + 1
+    total_ranks = max(global_map.keys()) + 1
+    # Obtain remapping from custom pattern (remains unchanged)
+    remap_by_job = rank_remap_for_job(rank_mapping)
+    # Obtain positions in each GOAL file based on expected number of ranks (pattern length)
+    rank_pos_by_job = get_rank_pos_in_goal_files(goal_files, rank_mapping)
 
     out = open(output_file, "w")
-    # Write preamble
     out.write(f"num_ranks {total_ranks}\n\n")
 
-    for i in tqdm(range(total_ranks), disable=not verbose):
-        job, rank = job_ranks[i]
-        out.write(f"rank {i} {{\n")
-        write_rank_sched_to_output(out, rank, rank_remap[job], rank_pos[job], goal_files[job])
+    # For each global rank, if it was mapped then use that job's schedule; otherwise create an empty block.
+    for global_rank in tqdm(range(total_ranks), disable=not verbose):
+        out.write(f"rank {global_rank} {{\n")
+        if global_rank in global_map:
+            job, job_rank = global_map[global_rank]
+            write_rank_sched_to_output(out, job_rank, remap_by_job[job], rank_pos_by_job[job], goal_files[job])
+        # If no rank mapping is provided for this global rank, leave the block empty.
         out.write("}\n\n")
-
     out.close()
-    print_success(f"Successfully generated multi-job goal file: {output_file}")
+    print_success(f"Successfully generated multi-job goal file: {output_file}", verbose)
 
-
-def generate_multi_tenant_goal(goal_files: List[str], rank_mapping: List[List[int]],
-                               output_file: str, verbose: bool) -> None:
-    """
-    Generates a multi-tenant goal file based on the given rank mapping as well
-    as the list of goal files.
-    """
+def generate_multi_tenant_goal(goal_files: List[str], rank_mapping: List[List[int]], output_file: str, verbose: bool) -> None:
     raise NotImplementedError("Multi-tenant goal generation is not implemented yet.")
-
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -404,16 +291,13 @@ if __name__ == "__main__":
     assert "pattern" in config, "'pattern' not found in the configuration file."
     
     if args.verbose:
-        print_info(f"Configuration:")
+        print_info("Configuration:")
         print_info(f"Mode: {config['mode']}")
         print_info(f"Goal Files: {config['goal_files']}")
 
     verbose = args.verbose
-
     job_ranks = load_number_of_ranks(config["goal_files"], verbose)
-
     rank_mapping = get_rank_mapping(config["mode"], job_ranks, config["pattern"], verbose)
-
     print_success(f"Successfully generated rank mapping: {rank_mapping}", verbose)
 
     if config["mode"] == "multi-job":

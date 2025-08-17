@@ -1,3 +1,13 @@
+.vscode/
+sim/htsim-backend/sim/tests/*
+*.bin
+*.tmp
+idmap.txt
+*.out
+*.tmp
+*Zone.Identifier
+random
+*.goal
 **/*.pyc
 **/*.pyo
 **/*.o
