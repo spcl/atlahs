@@ -37,3 +37,15 @@
 [submodule "apps/ai/dlrm"]
 	path = apps/ai/dlrm
 	url = https://github.com/facebookresearch/dlrm.git
+[submodule "apps/ai/MMaDA"]
+	path = apps/ai/MMaDA
+	url = https://github.com/Gen-Verse/MMaDA.git
+[submodule "apps/ai/astra-sim"]
+	path = apps/ai/astra-sim
+	url = https://github.com/astra-sim/astra-sim.git
+[submodule "apps/hpc/CloverLeaf_ref"]
+	path = apps/hpc/CloverLeaf_ref
+	url = https://github.com/UK-MAC/CloverLeaf_ref.git
+[submodule "apps/ai/vllm"]
+	path = apps/ai/vllm
+	url = https://github.com/vllm-project/vllm.git

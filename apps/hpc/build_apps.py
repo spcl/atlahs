@@ -456,7 +456,7 @@ def build_icon_dependencies(jobs: int = 1,
             print_error("Failed to run the autogen script")
             return False
         
-        config_cmd = f"CFLAGS=-fPIC ./configure --enable-tests=no --enable-shared --enable-parallel --enable-fortran --enable-fortran2003 --prefix=`pwd`/install"
+        config_cmd = f"CFLAGS=-fPIC CC=mpicc FC=mpif90 ./configure --enable-tests=no --enable-shared --enable-parallel --enable-fortran --enable-fortran2003 --prefix=`pwd`/install"
 
         if os.system(config_cmd) != 0:
             print_error("Failed to configure the build")
@@ -474,7 +474,7 @@ def build_icon_dependencies(jobs: int = 1,
         os.environ["PATH"] = f"{hdf5_install_dir}/bin:{os.environ['PATH']}"
 
         # Makes sure that HDF5 is actually installed
-        if os.system("h5pfc -v") != 0:
+        if os.system("h5pfc -show") != 0:
             print_error("Failed to verify the installation of HDF5")
             return False
 
@@ -692,15 +692,121 @@ def build_icon(jobs: int = 1,
     return True
 
 
+def build_openmx(jobs: int = 1,
+                 verbose: bool = False) -> bool:
+    """
+    Builds the OpenMX application.
+    """
+    print("[INFO] Building OpenMX...", flush=True)
+    
+    download_link = "https://www.openmx-square.org/openmx3.7.tar.gz"
+
+    # Checks if the directory 'openmx' exists
+    if not os.path.exists("openmx3.7"):
+        if verbose:
+            print("[INFO] Downloading the OpenMX tar file...")
+        # Downloads the OpenMX tar file
+        if os.system(f"wget {download_link}") != 0:
+            print_error("Failed to download the OpenMX tar file")
+            return False
+        
+        # Unzips the OpenMX tar file
+        if os.system("tar -xzf openmx3.7.tar.gz") != 0:
+            print_error("Failed to unzip the OpenMX tar file")
+            return False
+        
+        # Removes the tar file
+        if os.system("rm openmx3.7.tar.gz") != 0:
+            print_error("Failed to remove the OpenMX tar file")
+            return False
+    else:
+        if verbose:
+            print("[INFO] OpenMX directory already exists, skipping download...")
+    
+    os.chdir("openmx3.7")
+    
+    os.chdir("source")
+
+    # Checks if the file 'makefile' exists
+    if not os.path.exists("makefile"):
+        print_error("File 'makefile' does not exist")
+        return False
+    
+    # Replace line 97 with 
+    # 'CC    = mpicc -fopenmp -O3 -I/usr/local/include -fcommon'
+    # in the file 'makefile' in the directory 'source'
+    if os.system("sed -i '97s/^CC.*/CC    = mpicc -fopenmp -O3 -I\/usr\/local\/include -fcommon/' makefile") != 0:
+        print_error("Failed to replace the line that starts with 'CC'")
+        return False
+    
+    # Replace line 98 with 
+    # 'FC    = mpif90 -fopenmp -O3 -I/usr/local/include -fallow-argument-mismatch'
+    # in the file 'makefile' in the directory 'source'
+    if os.system("sed -i '98s/^FC.*/FC    = mpif90 -fopenmp -O3 -I\/usr\/local\/include -fallow-argument-mismatch/' makefile") != 0:
+        print_error("Failed to replace the line that starts with 'FC'")
+        return False
+    
+    # Replace line 99 with 
+    # 'LIB   = -L/usr/local/lib -lfftw3 -llapack -lblas -lgfortran -lmpi_mpifh -lmpi'
+    # in the file 'makefile' in the directory 'source'
+    if os.system("sed -i '99s/^LIB.*/LIB   = -L\/usr\/local\/lib -lfftw3 -llapack -lblas -lgfortran -lmpi_mpifh -lmpi/' makefile") != 0:
+        print_error("Failed to replace the line that starts with 'LIB'")
+        return False
+
+    if os.system('make clean') != 0:
+        print_error("Failed to clean the directory")
+        return False
+    
+    # Add the argument '-fallow-argument-mismatch' to the make command
+    if os.system(f"make -j {jobs} install") != 0:
+        print_error("Failed to build the OpenMX application")
+        return False
+    
+    assert os.path.exists("openmx"), "openmx executable does not exist"
+
+    os.chdir("../../")
+
+    return True
+
+
+def build_cloverleaf(jobs: int = 1,
+                    verbose: bool = False) -> bool:
+    """
+    Builds the Cloverleaf application.
+    """
+    print("[INFO] Building Cloverleaf...")
+    
+    if not os.path.exists("CloverLeaf_ref"):
+        print_error("Directory 'CloverLeaf_ref' does not exist. Make sure to clone the submodule")
+        return False
+    
+    os.chdir("CloverLeaf_ref")
+    
+    if os.system("make clean") != 0:
+        print_error("Failed to clean the directory")
+        return False
+    
+    if os.system(f"make -j {jobs} COMPILER=GNU") != 0:
+        print_error("Failed to build the Cloverleaf application")
+        return False
+
+    assert os.path.exists("clover_leaf"), "clover_leaf executable does not exist"
+
+    os.chdir("../../")
+
+    return True
+
 
 # The build functions for each benchmark
 build_funcs = {
     "lulesh": build_lulesh,
-    "npb": build_npb,
+    # "npb": build_npb,
     "hpcg": build_hpcg,
-    "milc": build_milc,
+    # "milc": build_milc,
     "lammps": build_lammps,
     "icon": build_icon,
+    "openmx": build_openmx,
+    "cloverleaf": build_cloverleaf,
 }
 
 
@@ -714,7 +820,7 @@ def build_app(app: str,
 
 
     if app == "all":
-        apps = [ "lulesh", "npb", "hpcg", "lammps", "milc", "icon" ]
+        apps = [ "lulesh", "hpcg", "lammps", "icon", "openmx", "cloverleaf" ]
     else:
         apps = [app]
 

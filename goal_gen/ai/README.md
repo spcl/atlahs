@@ -1,8 +1,8 @@
-# nccl_goal_generator
+# GOAL Generation for AI (NCCL) Applications
 
-## 1. Introduction
+## Introduction
 
-**nccl_goal_generator** is a toolchain for **tracing and parsing [NCCL](https://github.com/NVIDIA/nccl) communication** data, producing a compiled `GOAL` file that can be fed into [LogGOPSim](https://github.com/spcl/LogGOPSim) for large-scale network simulation.
+**nccl_goal_generator** is a toolchain for **tracing and parsing [NCCL](https://github.com/NVIDIA/nccl) communication** data, producing a compiled `GOAL` file.
 
 This toolchain includes:
 
@@ -16,7 +16,7 @@ This toolchain includes:
 
 ---
 
-## 2. Features & Workflow
+## Features & Workflow
 
 1. **Tracing NCCL Communication**
 
@@ -33,18 +33,9 @@ This toolchain includes:
 
 ---
 
-## 3. Dependencies & Installation
+## Dependencies & Installation
 
-### 3.1 Cloning this Repository
-
-To clone this repository along with its submodules, use:
-
-```bash
-git clone --recursive https://github.com/ZhiyiHu1999/nccl_goal_generator
-cd nccl_goal_generator
-```
-
-### 3.2 Install Required Dependencies
+### Install Required Dependencies
 
 1. **nccl_nvtx_v2.20.5-1** (NCCL with  NVTX annotations)
 
@@ -80,43 +71,10 @@ cd nccl_goal_generator
    ## A successful installation should output like:
    ~/opt/nvidia/nsight-systems-cli/2024.5.1/bin/nsys
    ```
-3. **LogGOPSim**
 
-   - [Repository](https://github.com/spcl/LogGOPSim)
-   - Used as a submodule.
-   - Consumes the `goal` file generated for network simulation.
-   - Necessary setting (may require minor modifications based on your path):
+## Usage Introduction
 
-   ```bash
-   echo 'export PATH=$HOME/nccl_goal_generator/third_party/LogGOPSim-1.1:$PATH' >> ~/.bashrc
-   source ~/.bashrc
-
-   ## To verify the installation:
-   which txt2bin
-   ## A successful installation should output like:
-   ~/nccl_goal_generator/third_party/LogGOPSim-1.0/txt2bin
-
-   ## To verify the installation:
-   which LogGOPSim 
-   ## A successful installation should output like:
-   ~/nccl_goal_generator/third_party/LogGOPSim-1.0/LogGOPSim
-   ```
-
-### 3.3 Install nccl_goal_generator
-
-```bash
-   cd $HOME/nccl_goal_generator
-   pip install -e .
-
-   ## To verify the installation:
-   which nccl_goal_generator 
-   ## A successful installation should output like:
-   ~/anaconda3/bin/nccl_goal_generator
-```
-
-## 4. Usage Introduction
-
-### 4.1 Usage Steps
+### Usage Steps
 
 Steps to use the toolchain include:
 
@@ -138,14 +96,3 @@ Steps to use the toolchain include:
   ## Modified command that uses the toolchain
   nccl_goal_generator --training_script run_ds.sh --results_dir results --config_node_gpu node_gpu_config.yaml
   ```
-
-### 4.2 Arguments
-
-- `--training_script`: Path to the training script that can run in step 1.
-- `--results_dir`: Path for the compiled goal file (bin file).
-- `--config_node_gpu`: Path for the user specified nodes and GPUs configuration. (The total number of GPUs you specify should be equal to the GPUs used for tracing)
-
-## 5. TODO
-
-- ~~Apply NPKit estimated probablistic model for reduction time to trace generator~~
-- ~~For different streams on a node, add `cpu <streamID>` for the calc time~~

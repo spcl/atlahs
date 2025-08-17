@@ -8,3 +8,6 @@ idmap.txt
 *Zone.Identifier
 random
 *.goal
+**/*.pyc
+**/*.pyo
+**/*.o

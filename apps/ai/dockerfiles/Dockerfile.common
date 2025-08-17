@@ -1,0 +1,43 @@
+FROM nvcr.io/nvidia/pytorch:24.10-py3
+
+# to avoid interaction with apt-get
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --allow-downgrades --allow-change-held-packages --no-install-recommends \
+        build-essential \
+	gengetopt \
+	re2c \
+	libgraphviz-dev \
+        automake \
+        autoconf \
+        libtool \
+        wget \
+        libpmi2-0-dev \
+        ca-certificates \
+	graphviz \
+	git-lfs \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+
+# DLRM & Chakra related 
+RUN git clone https://github.com/mlperf/logging.git mlperf-logging && pip install -e mlperf-logging && \
+    pip install https://github.com/mlcommons/chakra/archive/refs/heads/main.zip && git clone https://github.com/facebookresearch/param.git && \
+    cd param/et_replay && git checkout 7b19f586dd8b267333114992833a0d7e0d601630 && pip install . && \
+    cd ../../ && git clone https://github.com/facebookresearch/HolisticTraceAnalysis.git && \
+    cd HolisticTraceAnalysis && git checkout cc4ce6098bc73800b43a131a6d1e986b82d54230 && git submodule update --init && \
+    pip install -r requirements.txt && \
+    # Insert the following line to the file hta/common/trace.py at line 185
+    # df["stream"] = df["stream"].astype(int)
+    sed -i '185i\    df["stream"] = df["stream"].astype(int)' hta/common/trace.py && \
+    pip install -e .
+
+RUN pip install setuptools==69.5.1 datasets accelerate evaluate tokenizers sentencepiece transformers==4.46.0 nltk deepspeed flash-attn nvtx msgspec \
+    tqdm protobuf==6.31.0 tensorboard tiktoken wandb drawsvg gurobipy pulp scipy pyarrow regex torchrec-nightly torchx-nightly opencv-python==4.11.0.86 \
+    diffusers==0.32.2 imageio easydict ftfy dashscope imageio-ffmpeg flash_attn gradio modelscope omegaconf webdataset jaxtyping typeguard einops regex aiohttp prometheus_client tiktoken \
+    llguidance>=0.7.11 outlines lark xgrammar==0.1.19 pyzmq partial-json-parser importlib_metadata depyf==0.19.0 cloudpickle blake3 filelock>=3.16.1 cbor2 setproctitle pybase64 \
+    compressed-tensors==0.10.2 diskcache==5.6.3 outlines_core==0.2.10  \
+    lightning image-reward torchmetrics==1.6.2 trl==0.17.0 math_verify && \
+    pip install git+https://github.com/openai/CLIP.git && \
+    pip install git+https://github.com/fanshiqing/grouped_gemm@v1.1.4
+
+

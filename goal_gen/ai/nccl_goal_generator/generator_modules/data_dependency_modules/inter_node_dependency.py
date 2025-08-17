@@ -248,14 +248,19 @@ def get_inter_node_microevents_dependency(nccl_group_events, comm_init_events, c
 
                                             for elemOffset in range(0, channelCount, loopCount):
                                                 remCount = channelCount - elemOffset
+                                                # Use local variable to avoid corrupting other steps
+                                                current_chunkCount = elem['chunkCount']
                                                 if (remCount < loopCount):
-                                                    chunkCount = lastChunkCount
+                                                    # Validate lastChunkCount before using it
+                                                    if lastChunkCount > 0 and lastChunkCount <= channelCount and lastChunkCount <= 10 * elem['chunkCount']:
+                                                        current_chunkCount = lastChunkCount
+                                                    # else: keep using original chunkCount
                                                 
                                                 ## step 0: Send
                                                 chunk = modRanks(int(ringIx) + int(nranks) - 1, int(nranks))
-                                                chunkOffset = chunk * chunkCount
+                                                chunkOffset = chunk * current_chunkCount
                                                 # offset = gridOffset + elemOffset + chunkOffset
-                                                nelem = int(min(chunkCount, remCount - chunkOffset))
+                                                nelem = int(min(current_chunkCount, remCount - chunkOffset))
                                                 nelem = 0 if nelem < 0 else nelem
                                                 # prims.send(offset, nelem)
                                                 if proto == '0':
@@ -307,9 +312,9 @@ def get_inter_node_microevents_dependency(nccl_group_events, comm_init_events, c
                                                 ## Step 1 to step (k - 2): RecvReduceSend
                                                 for j in range(2, nranks):
                                                     chunk = modRanks(int(ringIx) + int(nranks) - j, int(nranks))
-                                                    chunkOffset = chunk * chunkCount
+                                                    chunkOffset = chunk * current_chunkCount
                                                     # offset = gridOffset + elemOffset + chunkOffset
-                                                    nelem = int(min(chunkCount, remCount - chunkOffset))
+                                                    nelem = int(min(current_chunkCount, remCount - chunkOffset))
                                                     nelem = 0 if nelem < 0 else nelem
                                                     # prims.recvReduceSend(offset, nelem)
 
@@ -389,9 +394,9 @@ def get_inter_node_microevents_dependency(nccl_group_events, comm_init_events, c
 
                                                 ## Step (k - 1): RecvReduceCopySend
                                                 chunk = int(ringIx) + 0  # 0
-                                                chunkOffset = chunk * chunkCount  ## 0
+                                                chunkOffset = chunk * current_chunkCount  ## 0
                                                 # offset = gridOffset + elemOffset + chunkOffset  ## 0
-                                                nelem = int(min(chunkCount, remCount - chunkOffset))  ## min(524288， 1024 - 524288)
+                                                nelem = int(min(current_chunkCount, remCount - chunkOffset))  ## min(524288， 1024 - 524288)
                                                 nelem = 0 if nelem < 0 else nelem
                                                 # prims.directRecvReduceCopySend(offset, offset, nelem, /*postOp=*/true)
 
@@ -472,9 +477,9 @@ def get_inter_node_microevents_dependency(nccl_group_events, comm_init_events, c
                                                 ## Step k to step (2k - 3): RecvCopySend
                                                 for j in range(1, nranks - 1):
                                                     chunk = modRanks(int(ringIx) + int(nranks) - j, int(nranks))
-                                                    chunkOffset = chunk * chunkCount
+                                                    chunkOffset = chunk * current_chunkCount
                                                     # offset = gridOffset + elemOffset + chunkOffset
-                                                    nelem = int(min(chunkCount, remCount - chunkOffset))
+                                                    nelem = int(min(current_chunkCount, remCount - chunkOffset))
                                                     nelem = 0 if nelem < 0 else nelem
                                                     # prims.directRecvCopySend(offset, nelem)
 
@@ -554,9 +559,9 @@ def get_inter_node_microevents_dependency(nccl_group_events, comm_init_events, c
 
                                                 ## Step (2k - 2): Recv
                                                 chunk = modRanks(int(ringIx) + 1, int(nranks))
-                                                chunkOffset = chunk * chunkCount
+                                                chunkOffset = chunk * current_chunkCount
                                                 # offset = gridOffset + elemOffset + chunkOffset
-                                                nelem = int(min(chunkCount, remCount - chunkOffset))
+                                                nelem = int(min(current_chunkCount, remCount - chunkOffset))
                                                 nelem = 0 if nelem < 0 else nelem
                                                 # prims.directRecv(offset, nelem)
 
@@ -1979,7 +1984,15 @@ def get_inter_node_microevents_dependency(nccl_group_events, comm_init_events, c
                                         prev_event_task_counter = SendRecvEvents_To_TaskCounter[goal_rank_prev][gpuId_prev][commId][event['event_type']][event['seq']][channel_id]['send'][ringIx]
 
                                         if goal_rank_prev == goal_rank:
-                                            for i in range(len(my_event_task_counter)):
+                                            # Minimal debug: just log first few mismatches
+                                            recv_len = len(my_event_task_counter)
+                                            send_len = len(prev_event_task_counter)
+                                            
+                                            # if recv_len != send_len and goal_rank == 0 and event['seq'] <= 2:
+                                            #     print(f"MISMATCH: recv={recv_len}, send={send_len}, gpuId={gpuId}, seq={event['seq']}, ch={channel_id}")
+                                            
+                                            # Arrays should now have matching lengths due to the fix in in_gpu_dependency.py
+                                            for i in range(recv_len):
                                                 my_receive_task_counter = my_event_task_counter[i]
                                                 prev_send_task_counter = prev_event_task_counter[i]
                                                 file.write(f"l{int(my_receive_task_counter)} requires l{int(prev_send_task_counter)}\n")

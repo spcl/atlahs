@@ -160,7 +160,7 @@ def get_events_parallel_group(nccl_events):
                                     'protocol': coll_event['protocol'],
                                     'data_size': coll_event['data_size'],
                                     'type_size': coll_event['type_size'],
-                                    'root': coll_event['root'],
+                                    'root_rank': coll_event['root_rank'],
                                     'red_op': coll_event['red_op'],
                                     'seq': coll_event['seq'],
                                     'chunkSteps': coll_event['chunkSteps'],

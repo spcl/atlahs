@@ -4,7 +4,7 @@
 #SBATCH --ntasks-per-node=1        # Do not change
 #SBATCH --gpus-per-node=4          # number of gpus per node
 #SBATCH --partition=normal
-#SBTACH --account a-g34
+#SBATCH --account a-g34
 #SBATCH --time=00:10:00            # total run time limit (HH:MM:SS)
 
 
@@ -17,6 +17,9 @@ usage() {
   echo "Usage: $0 [--trace atlahs|astrasim]"
   exit 1
 }
+
+TRACE_DIR="/capstor/scratch/cscs/sshen/workspace/atlahs/apps/ai/scripts/ai_traces"
+
 
 # Process command-line arguments
 while [[ "$#" -gt 0 ]]; do
@@ -184,6 +187,16 @@ TRAINING_ARGS=" \
     --tensorboard-dir ${BASE_PATH} \
     "
 
+
+if [[ "$USE_TRACING" == true ]]; then
+       # Checks if the directory exists, if it doesn't, make it
+       if [ ! -d "${TRACE_DIR}" ]; then
+              mkdir -p ${TRACE_DIR}
+       fi
+       echo "Tracing enabled, traces will be saved in ${TRACE_DIR}"
+fi
+
+
 if [[ "$USE_TRACING" == true && "$trace" == "atlahs" ]]; then
        TRAINING_ARGS=" \
               ${TRAINING_ARGS} \
@@ -196,7 +209,7 @@ fi
 if [[ "$USE_TRACING" == true && "$trace" == "astrasim" ]]; then
        TRAINING_ARGS=" \
               ${TRAINING_ARGS} \
-              --use-pytorch-profile \
+              --use-pytorch-profiler \
               --profile-step-start 8 \
               --profile-step-end 10 \
               "
@@ -288,12 +301,6 @@ NSYS=""
 # "
 
 if [[ "$USE_TRACING" == true && "$trace" == "atlahs" ]]; then
-
-       NSYS_REPORTS_DIR=/capstor/scratch/cscs/sshen/workspace/atlahs/apps/ai/scripts
-       # Checks if the directory exists, if it doesn't, make it
-       if [ ! -d "${NSYS_REPORTS_DIR}" ]; then
-              mkdir -p ${NSYS_REPORTS_DIR}
-       fi
        NSYS="\
               nsys profile \
               --trace='nvtx,cuda' \
@@ -302,7 +309,7 @@ if [[ "$USE_TRACING" == true && "$trace" == "atlahs" ]]; then
               --cuda-um-cpu-page-faults=false \
               --cuda-um-gpu-page-faults=false \
               -s none \
-              --output='${NSYS_REPORTS_DIR}/nsys_reports/nsys_report_%h_%p.nsys-rep' \
+              --output='${TRACE_DIR}/nsys_report_%h_%p.nsys-rep' \
               "
        echo "ATLAHS tracing enabled, nsys reports will be saved in ${NSYS_REPORTS_DIR}"
 fi
@@ -310,7 +317,7 @@ fi
 
 
 RUN="${NSYS}${CMD}"
-srun --export=ALL,LD_PRELOAD=/users/sshen/workspace/nccl_goal_generator/third_party/nccl_nvtx/nccl/build/lib/libnccl.so --mpi=pmi2 --environment=megatron bash -c "
+srun --export=ALL,LD_PRELOAD=/users/sshen/workspace/nccl_goal_generator/third_party/nccl_nvtx/nccl/build/lib/libnccl.so,TRACE_DIR=${TRACE_DIR} --mpi=pmi2 --environment=ml bash -c "
 export NODE_RANK=\${SLURM_NODEID}
 echo ${RUN}
 ${RUN} 2>&1 | tee ${LOG_PATH}

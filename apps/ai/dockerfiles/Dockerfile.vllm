@@ -1,0 +1,96 @@
+FROM nvcr.io/nvidia/pytorch:24.12-py3
+
+# to avoid interaction with apt-get
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --allow-downgrades --allow-change-held-packages --no-install-recommends \
+        build-essential \
+        gengetopt \
+        re2c \
+        libgraphviz-dev \
+        automake \
+        autoconf \
+        libtool \
+        wget \
+        libpmi2-0-dev \
+        ca-certificates \
+        graphviz \
+        git-lfs \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+
+# DLRM & Chakra related
+RUN git clone https://github.com/mlperf/logging.git mlperf-logging && pip install -e mlperf-logging && \
+    pip install https://github.com/mlcommons/chakra/archive/refs/heads/main.zip && git clone https://github.com/facebookresearch/param.git && \
+    cd param/et_replay && git checkout 7b19f586dd8b267333114992833a0d7e0d601630 && pip install . && \
+    cd ../../ && git clone https://github.com/facebookresearch/HolisticTraceAnalysis.git && \
+    cd HolisticTraceAnalysis && git checkout cc4ce6098bc73800b43a131a6d1e986b82d54230 && git submodule update --init && \
+    pip install -r requirements.txt && \
+    # Insert the following line to the file hta/common/trace.py at line 185
+    # df["stream"] = df["stream"].astype(int)
+    sed -i '185i\    df["stream"] = df["stream"].astype(int)' hta/common/trace.py && \
+    pip install -e . && pip install -U packaging && pip install --index-url https://download.pytorch.org/whl/cu126 torch==2.6.0 torchvision==0.21.0
+
+# Install all common dependencies directly
+RUN pip install \
+    datasets \
+    transformers \
+    setuptools_scm \
+    "setuptools>=77" \
+    regex \
+    cachetools \
+    psutil \
+    sentencepiece \
+    "numpy<2" \
+    "requests>=2.26.0" \
+    tqdm \
+    blake3 \
+    py-cpuinfo \
+    "transformers>=4.51.1" \
+    "huggingface-hub[hf_xet]>=0.30.0" \
+    "tokenizers>=0.21.1" \
+    protobuf \
+    "fastapi[standard]>=0.115.0" \
+    aiohttp \
+    "openai>=1.52.0" \
+    "pydantic>=2.9" \
+    "prometheus_client>=0.18.0" \
+    pillow \
+    "prometheus-fastapi-instrumentator>=7.0.0" \
+    "tiktoken>=0.6.0" \
+    "lm-format-enforcer>=0.10.11,<0.11" \
+    "llguidance>=0.7.9,<0.8.0" \
+    "outlines==0.1.11" \
+    "lark==1.2.2" \
+    "xgrammar==0.1.18" \
+    "typing_extensions>=4.10" \
+    "filelock>=3.16.1" \
+    partial-json-parser \
+    "pyzmq>=25.0.0" \
+    msgspec \
+    "gguf>=0.13.0" \
+    importlib_metadata \
+    "mistral_common[opencv]>=1.5.4" \
+    "opencv-python-headless>=4.11.0" \
+    pyyaml \
+    "six>=1.16.0" \
+    einops \
+    "compressed-tensors==0.9.3" \
+    "depyf==0.18.0" \
+    cloudpickle \
+    watchfiles \
+    python-json-logger \
+    scipy \
+    ninja \
+    "opentelemetry-sdk>=1.26.0,<1.27.0" \
+    "opentelemetry-api>=1.26.0,<1.27.0" \
+    "opentelemetry-exporter-otlp>=1.26.0,<1.27.0" \
+    "opentelemetry-semantic-conventions-ai>=0.4.1,<0.5.0" \
+    pybase64 \
+    cbor2 \
+    setproctitle \
+    "openai-harmony>=0.0.3" \
+    hf-transfer \
+    flash_attn \
+    nvidia-cutlass \
+    ray

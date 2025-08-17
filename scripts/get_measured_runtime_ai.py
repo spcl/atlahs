@@ -20,7 +20,6 @@ def nsys_profiling_marks_present(trace_dir: str) -> Optional[float]:
     res = None
     for db_file in db_files:
         assert os.path.exists(db_file), f"File {db_file} does not exist"
-
         # Connects to the SQLite database file
         conn = sqlite3.connect(db_file)
         cursor = conn.cursor()
