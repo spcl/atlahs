@@ -201,6 +201,11 @@ def build_apps(reproduce: bool, trace: bool, verbose: bool = True) -> None:
     if reproduce:
         print_info("Building the simulators for reproducing the results...")
         build_sims(verbose)
+        # FIXME: Ugly code
+        assert os.path.exists(HPC_GOAL_GEN_DIR), "HPC goal gen not found"
+        os.chdir(HPC_GOAL_GEN_DIR)
+        build_schedgen(verbose)
+        os.chdir(CURR_DIR)
     elif trace:
         print_info("Building the simulators for tracing and producing the GOAL schedules...")
         build_all_apps(verbose)

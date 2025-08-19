@@ -107,10 +107,8 @@ def run_case_studies(data_dir: str, overwrite: bool, verbose: bool) -> None:
     current_case_studies = ["llama_lgs_vs_htsim", "job_alloc", "storage"]
     for type_run in current_case_studies:
         if "llama_lgs_vs_htsim" in type_run:
-            continue
             run_lgs_vs_htsim(data_dir, overwrite, verbose)
         elif "job_alloc" in type_run:
-            continue
             run_job_alloc(data_dir, overwrite, verbose)
         elif "storage" in type_run:
             run_storage(data_dir, overwrite, verbose)
