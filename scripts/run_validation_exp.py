@@ -17,8 +17,8 @@ AI_RUNTIME_SCRIPT = "/workspace/scripts/get_measured_runtime_ai.py"
 NSYS_REP_TO_SQLITE_SCRIPT = "/workspace/scripts/nsys_reports_to_sqlite.sh"
 
 LGS_EXEC_PATH = "/workspace/sim/LogGOPSim/LogGOPSim"
-# TODO Tommaso: Add htsim executable path
-# HTSIM_EXEC_PATH = ""
+HTSIM_ROOT_PATH = "/workspace/sim/htsim-backend/sim/"
+HTSIM_EXEC_PATH = "/workspace/sim/htsim-backend/sim/datacenter/htsim_uec"
 ASTRA_SIM_EXEC_SCRIPT = "/workspace/apps/ai/astra-sim/examples/network_analytical/run_network_analytical.sh"
 ASTRA_SIM_CONFIG_PATH = "/workspace/scripts/configs/astrasim_network.yml"
 
@@ -239,6 +239,13 @@ def run_validation_exp(data_dir: str, app_type: str, overwrite: bool, verbose: b
             shutil.rmtree(result_dir)
             print_success(f"Overwriting existing results...")
 
+    # Initialize HTSim CSV file (clear old content)
+    output_dir = os.path.join(OUTPUT_DIR, app_type)
+    os.makedirs(output_dir, exist_ok=True)
+    htsim_csv = os.path.join(output_dir, "atlahs_htsim.csv")
+    open(htsim_csv, "w").close()
+    print_info(f"Cleared HTSim results file: {htsim_csv}")
+    
     goal_sizes = {}
     chakra_sizes = {}
 
@@ -257,7 +264,76 @@ def run_validation_exp(data_dir: str, app_type: str, overwrite: bool, verbose: b
         print_info(f"Running command: {lgs_cmd}")
         assert os.system(lgs_cmd) == 0, f"Error running the LGS simulator for {workload_dir}."
 
-        htsim_cmd = "" # TODO Tommaso: Add htsim command
+        # Run the HTSim simulator
+        # Prepare HTSim output directory inside the workload_dir
+        htsim_output_dir = os.path.join(workload_dir, "htsim_output")
+        if not os.path.exists(htsim_output_dir):
+            os.makedirs(htsim_output_dir)
+            print_info(f"Created HTSim output directory: {htsim_output_dir}")
+
+        # Find the only .bin file in workload_dir
+        bin_files = [f for f in os.listdir(workload_dir) if f.endswith(".bin")]
+        assert len(bin_files) == 1, (
+            f"Expected exactly one .bin file in {workload_dir}, "
+            f"found {len(bin_files)}"
+        )
+        goal_file_path = os.path.join(workload_dir, bin_files[0])
+
+        # Print inner folder name
+        inner_name = Path(workload_dir).name
+        print_info(f"Inner folder name: {inner_name}")
+
+        # build HTSim command parameters
+        if app_type == "ai":
+            topo = "leaf_spine_1024.topo"
+            linkspeed = 200000
+            lgso = 0
+        else:  # hpc
+            topo = "leaf_spine_1024_hpc.topo"
+            linkspeed = 43000
+            lgso = 5000
+
+        # point -goal at the single .bin file for both AI and HPC
+        goal = goal_file_path
+
+        htsim_cmd = (
+            f"{HTSIM_EXEC_PATH} "
+            f"-topo {HTSIM_ROOT_PATH}/datacenter/topologies/{topo} "
+            f"-lgs_o {lgso} -goal {goal} "
+            f"-linkspeed {linkspeed} -nodes 1024 "
+            f"-strat ecmp_host -mtu 4096 -paths 128 -q 1000000 "
+            f"> {htsim_output_dir}/htsim_output.tmp"
+        )
+
+        print_info(f"Running command: {htsim_cmd}")
+        assert os.system(htsim_cmd) == 0, f"Error running the HTSim simulator for {workload_dir}."
+
+        # parse max completing host time from the HTSim log
+        host_times = []
+        tmp_file = os.path.join(htsim_output_dir, "htsim_output.tmp")
+        with open(tmp_file, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("Host"):
+                    parts = line.split(":")
+                    if len(parts) >= 2:
+                        try:
+                            host_times.append(int(parts[1].strip()))
+                        except ValueError:
+                            pass
+
+        if host_times:
+            htsim_max_host_time = max(host_times)
+        else:
+            htsim_max_host_time = None
+
+        print_info(f"Parsed HTSim max host time: {htsim_max_host_time}")
+
+        # write the HTSim max host time to a CSV in the output directory
+        csv_file = os.path.join(output_dir, "atlahs_htsim.csv")
+        with open(csv_file, "a") as f:
+            f.write(f"{inner_name},{htsim_max_host_time}\n")
+        print_success(f"Appended HTSim time to {csv_file}")
 
         # astrasim_cmd = f"bash {ASTRA_SIM_EXEC_SCRIPT} -i {workload_dir} -o {output_dir} -v -c {ASTRA_SIM_CONFIG_PATH} -s astra_sim -t {app_type} -e {ASTRA_SIM_EXEC_PATH}"
         if app_type == "ai":

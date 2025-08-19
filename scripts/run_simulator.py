@@ -239,9 +239,6 @@ def run_validation_exp_for_workload(workload_dir: str, result_dir: str, simulato
     pred_runtime = None
     if simulator == "atlahs_lgs":
         pred_runtime = run_lgs_simulator(bin_file, sim_config, exec, verbose)
-    elif simulator == "atlahs_htsim":
-        # TODO TOMMASO: Implement the function to run the HTSIM simulator
-        pass
     else:
         raise ValueError("Invalid simulator.")
     

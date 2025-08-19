@@ -11,3 +11,12 @@ random
 **/*.pyc
 **/*.pyo
 **/*.o
+testing/
+data/
+lgs_vs_htsim.pdf
+log/
+# Python bytecode & caches
+__pycache__/
+*.py[cod]
+*$py.class
+logout.dat

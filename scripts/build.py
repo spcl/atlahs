@@ -5,7 +5,7 @@ import sys
 import subprocess
 
 LOGGOPSIM_DIR = "sim/LogGOPSim"
-HTSIM_DIR = "sim/htsim"
+HTSIM_DIR = "sim/htsim-backend/sim"
 ASTRASIM_DIR = "apps/ai/astra-sim"
 HPC_GOAL_GEN_DIR = "goal_gen/hpc"
 HPC_APPS_DIR = "apps/hpc"
@@ -61,7 +61,18 @@ def build_htsim(verbose: bool = True) -> None:
     print_info("Building the HTSim...", verbose)
     assert os.path.exists(HTSIM_DIR), "HTSim not found"
     os.chdir(HTSIM_DIR)
-    # TODO Tommaso
+
+    # Build the HTSim binary
+    subprocess.run(
+        "make clean && cd datacenter/ && make clean && cd .. && "
+        "make -j 8 && cd datacenter/ && make -j 8 && cd ..",
+        shell=True,
+        check=True,
+        stdout=sys.stderr,
+        stderr=sys.stderr
+    )
+    print_success("HTSim built successfully", verbose)
+
     os.chdir(CURR_DIR)
 
 

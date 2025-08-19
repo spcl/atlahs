@@ -16,7 +16,7 @@ algorithms = ["ATLAHS LGS", "ATLAHS htsim"]
 # Dummy data for total run time for each algorithm and group
 run_time_data = {
     "ATLAHS LGS": [2.12, 2.12],      # Dummy values for each group
-    "ATLAHS htsim": [2.13, 4.67]     # Dummy values for each group
+    "ATLAHS htsim": [2.13, 4.61]     # Dummy values for each group
 }
 
 dropped_packets_data = [292765, 206409686]  
