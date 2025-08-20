@@ -28,9 +28,6 @@
 [submodule "apps/hpc/deps/netcdf-fortran"]
 	path = apps/hpc/deps/netcdf-fortran
 	url = https://github.com/Unidata/netcdf-fortran.git
-[submodule "sim/htsim"]
-	path = sim/htsim
-	url = https://github.com/spcl/HTSIM.git
 [submodule "apps/ai/Megatron-LM"]
 	path = apps/ai/Megatron-LM
 	url = https://github.com/NVIDIA/Megatron-LM.git

@@ -20,3 +20,4 @@ __pycache__/
 *.py[cod]
 *$py.class
 logout.dat
+**/__pycache__/

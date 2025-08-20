@@ -10,7 +10,6 @@ An Application-centric Network Simulator Toolchain for AI, HPC, and Distributed 
 
 ## Warning
 This repository is still under active development. The code is not yet stable, and the documentation is not yet finalized.
-It is highly recommended to start using the toolchain after the paper is published, and when the documentation is mostly complete.
 
 ## Overview
 ![Overview](docs/overview.png)
@@ -27,6 +26,8 @@ Along with the source code, we also release all the traces (raw files and conver
 
 ## Docker Environment
 To facilitate the reproducibility of the results which we publish in the paper, we provide a Docker image that contains all the dependencies that are required to run the ATLAHS toolchain.
+
+Make sure to clone the repository with the `--recurse-submodules` flag to fetch all the dependent submodules.
 
 To build the Docker image, run the following command:
 
