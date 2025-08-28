@@ -323,7 +323,6 @@ if [[ "$USE_TRACING" == true && "$trace" == "atlahs" ]]; then
 fi
 
 
-
 RUN="${NSYS}${CMD}"
 srun -A a-g34 --export=ALL,LD_PRELOAD=/users/sshen/workspace/nccl_goal_generator/third_party/nccl_nvtx/nccl/build/lib/libnccl.so --mpi=pmi2 --environment=megatron bash -c "
 export NODE_RANK=\${SLURM_NODEID}

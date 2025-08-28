@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #SBATCH --job-name="megatron-llama2-pretrain"
-#SBATCH --nodes=4                 # number of nodes
+#SBATCH --nodes=1                 # number of nodes
 #SBATCH --ntasks-per-node=1        # Do not change
 #SBATCH --gpus-per-node=4          # number of gpus per node
 #SBATCH --partition=normal
@@ -311,7 +311,7 @@ if [[ "$USE_TRACING" == true && "$trace" == "atlahs" ]]; then
               -s none \
               --output='${TRACE_DIR}/nsys_report_%h_%p.nsys-rep' \
               "
-       echo "ATLAHS tracing enabled, nsys reports will be saved in ${NSYS_REPORTS_DIR}"
+       echo "ATLAHS tracing enabled, nsys reports will be saved in ${TRACE_DIR}"
 fi
 
 

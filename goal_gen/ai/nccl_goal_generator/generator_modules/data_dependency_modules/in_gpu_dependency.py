@@ -181,7 +181,6 @@ def get_in_gpu_microevents_dependency(nccl_group_events, comm_init_events,
                                 stepSize = event['stepSize']
 
                                 if algo == '1': ## Ring AllReduce
-                                    print(f"[RING ALLREDUCE] Processing rank {goal_rank}, GPU {gpuId}, Comm {commId}, Seq {event['seq']}")
                                     ringIx = comm_info[commId]['gpuId_To_rank'][gpuId]  ## local rank index in the communicator
                                     channel_info = comm_info[commId]['rank_To_rankInfo'][ringIx]['channel_info']['Ring']
 
@@ -229,18 +228,18 @@ def get_in_gpu_microevents_dependency(nccl_group_events, comm_init_events,
                                                     would_skip.append(debug_nelem <= 0)
                                                 
                                                 # This is where the bug would manifest!
-                                                print(f"[RING ALLREDUCE BUG DETECTED] Mismatch condition found:")
-                                                print(f"  CommId: {commId}, Seq: {event['seq']}, Channel: {channel_id}")
-                                                print(f"  elemOffset: {elemOffset}, remCount: {remCount}, current_chunkCount: {current_chunkCount}")
-                                                print(f"  max_chunk_offset: {max_chunk_offset}")
-                                                print(f"  Without fix, each rank would get nelem: {rank_nelems}")
-                                                print(f"  Without fix, ranks would skip: {would_skip}")
-                                                skipping_ranks = [i for i, skip in enumerate(would_skip) if skip]
-                                                non_skipping_ranks = [i for i, skip in enumerate(would_skip) if not skip]
-                                                print(f"  → Ranks {skipping_ranks} would SKIP operations")
-                                                print(f"  → Ranks {non_skipping_ranks} would PERFORM operations")
-                                                print(f"  → This would cause send/recv array length mismatch!")
-                                                print(f"  → FIX APPLIED: All ranks skip this iteration together")
+                                                # print(f"[RING ALLREDUCE BUG DETECTED] Mismatch condition found:")
+                                                # print(f"  CommId: {commId}, Seq: {event['seq']}, Channel: {channel_id}")
+                                                # print(f"  elemOffset: {elemOffset}, remCount: {remCount}, current_chunkCount: {current_chunkCount}")
+                                                # print(f"  max_chunk_offset: {max_chunk_offset}")
+                                                # print(f"  Without fix, each rank would get nelem: {rank_nelems}")
+                                                # print(f"  Without fix, ranks would skip: {would_skip}")
+                                                # skipping_ranks = [i for i, skip in enumerate(would_skip) if skip]
+                                                # non_skipping_ranks = [i for i, skip in enumerate(would_skip) if not skip]
+                                                # print(f"  → Ranks {skipping_ranks} would SKIP operations")
+                                                # print(f"  → Ranks {non_skipping_ranks} would PERFORM operations")
+                                                # print(f"  → This would cause send/recv array length mismatch!")
+                                                # print(f"  → FIX APPLIED: All ranks skip this iteration together")
                                                 
                                                 # Skip this iteration for all ranks to maintain send/recv balance
                                                 continue
@@ -1465,52 +1464,52 @@ def get_in_gpu_microevents_dependency(nccl_group_events, comm_init_events,
             # file.write("}\n")
 
         # DEBUG: Show Ring AllReduce operation counts for this rank
-        for gpuId, gpu_events in goal_events.items():
-            for streamId, stream_events in gpu_events.items():
-                for group_event_index, group_event in enumerate(stream_events):
-                    for event in group_event['events']:
-                        if event['event_type'] == 'AllReduce' and event.get('algorithm') == '1':  # Ring AllReduce
-                            commId = event['commId']
-                            seq = event['seq']
-                            elems = event.get('elems', [])
+        # for gpuId, gpu_events in goal_events.items():
+        #     for streamId, stream_events in gpu_events.items():
+        #         for group_event_index, group_event in enumerate(stream_events):
+        #             for event in group_event['events']:
+        #                 if event['event_type'] == 'AllReduce' and event.get('algorithm') == '1':  # Ring AllReduce
+        #                     commId = event['commId']
+        #                     seq = event['seq']
+        #                     elems = event.get('elems', [])
                             
-                            for channel_id, elem in enumerate(elems):
-                                if (goal_rank in SendRecvEvents_To_TaskCounter and 
-                                    gpuId in SendRecvEvents_To_TaskCounter[goal_rank] and
-                                    commId in SendRecvEvents_To_TaskCounter[goal_rank][gpuId] and
-                                    'AllReduce' in SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId] and
-                                    seq in SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId]['AllReduce'] and
-                                    channel_id in SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId]['AllReduce'][seq]):
+        #                     for channel_id, elem in enumerate(elems):
+        #                         if (goal_rank in SendRecvEvents_To_TaskCounter and 
+        #                             gpuId in SendRecvEvents_To_TaskCounter[goal_rank] and
+        #                             commId in SendRecvEvents_To_TaskCounter[goal_rank][gpuId] and
+        #                             'AllReduce' in SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId] and
+        #                             seq in SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId]['AllReduce'] and
+        #                             channel_id in SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId]['AllReduce'][seq]):
                                     
-                                    sends = SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId]['AllReduce'][seq][channel_id].get('send', {})
-                                    recvs = SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId]['AllReduce'][seq][channel_id].get('recv', {})
+        #                             sends = SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId]['AllReduce'][seq][channel_id].get('send', {})
+        #                             recvs = SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId]['AllReduce'][seq][channel_id].get('recv', {})
                                     
-                                    total_sends = sum(len(ops) for ops in sends.values())
-                                    total_recvs = sum(len(ops) for ops in recvs.values())
+        #                             total_sends = sum(len(ops) for ops in sends.values())
+        #                             total_recvs = sum(len(ops) for ops in recvs.values())
                                     
-                                    print(f"[RING ALLREDUCE SUMMARY] Rank {goal_rank}, GPU {gpuId}, Comm {commId}, Seq {seq}, Ch {channel_id}:")
-                                    print(f"  Total sends: {total_sends}, Total recvs: {total_recvs}")
+        #                             print(f"[RING ALLREDUCE SUMMARY] Rank {goal_rank}, GPU {gpuId}, Comm {commId}, Seq {seq}, Ch {channel_id}:")
+        #                             print(f"  Total sends: {total_sends}, Total recvs: {total_recvs}")
                                     
-                                    # Store in debug tracker for later comparison
-                                    key = f"comm_{commId}_seq_{seq}_ch_{channel_id}"
-                                    if key not in ring_allreduce_debug:
-                                        ring_allreduce_debug[key] = {}
-                                    ring_allreduce_debug[key][goal_rank] = {'sends': total_sends, 'recvs': total_recvs}
+        #                             # Store in debug tracker for later comparison
+        #                             key = f"comm_{commId}_seq_{seq}_ch_{channel_id}"
+        #                             if key not in ring_allreduce_debug:
+        #                                 ring_allreduce_debug[key] = {}
+        #                             ring_allreduce_debug[key][goal_rank] = {'sends': total_sends, 'recvs': total_recvs}
 
     # DEBUG: Check for mismatches across ranks
-    print(f"\n[RING ALLREDUCE MISMATCH CHECK]")
-    for key, rank_data in ring_allreduce_debug.items():
-        ranks = list(rank_data.keys())
-        if len(ranks) > 1:
-            send_counts = [rank_data[rank]['sends'] for rank in ranks]
-            recv_counts = [rank_data[rank]['recvs'] for rank in ranks]
+    # print(f"\n[RING ALLREDUCE MISMATCH CHECK]")
+    # for key, rank_data in ring_allreduce_debug.items():
+    #     ranks = list(rank_data.keys())
+    #     if len(ranks) > 1:
+    #         send_counts = [rank_data[rank]['sends'] for rank in ranks]
+    #         recv_counts = [rank_data[rank]['recvs'] for rank in ranks]
             
-            if len(set(send_counts)) > 1 or len(set(recv_counts)) > 1:
-                print(f"❌ MISMATCH DETECTED in {key}:")
-                for rank in ranks:
-                    print(f"   Rank {rank}: {rank_data[rank]['sends']} sends, {rank_data[rank]['recvs']} recvs")
-                print(f"   → This would cause IndexError in inter_node_dependency.py!")
-            else:
-                print(f"✅ {key}: All ranks match ({send_counts[0]} sends, {recv_counts[0]} recvs)")
+    #         if len(set(send_counts)) > 1 or len(set(recv_counts)) > 1:
+    #             print(f"❌ MISMATCH DETECTED in {key}:")
+    #             for rank in ranks:
+    #                 print(f"   Rank {rank}: {rank_data[rank]['sends']} sends, {rank_data[rank]['recvs']} recvs")
+    #             print(f"   → This would cause IndexError in inter_node_dependency.py!")
+    #         else:
+    #             print(f"✅ {key}: All ranks match ({send_counts[0]} sends, {recv_counts[0]} recvs)")
 
     return SendRecvEvents_To_TaskCounter

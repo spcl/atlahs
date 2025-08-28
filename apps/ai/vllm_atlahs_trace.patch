@@ -1,0 +1,108 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 3314f05fd..80d24cabb 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -31,7 +31,7 @@ set(ignoreMe "${VLLM_PYTHON_PATH}")
+ set(PYTHON_SUPPORTED_VERSIONS "3.9" "3.10" "3.11" "3.12")
+ 
+ # Supported NVIDIA architectures.
+-set(CUDA_SUPPORTED_ARCHS "7.0;7.2;7.5;8.0;8.6;8.7;8.9;9.0;10.0;10.1;12.0")
++set(CUDA_SUPPORTED_ARCHS "7.0;7.2;7.5;8.7;8.9;9.0;10.0;10.1;12.0")
+ 
+ # Supported AMD GPU architectures.
+ set(HIP_SUPPORTED_ARCHS "gfx906;gfx908;gfx90a;gfx942;gfx950;gfx1030;gfx1100;gfx1101;gfx1200;gfx1201")
+diff --git a/setup.py b/setup.py
+index a1867960e..15f9c35ab 100755
+--- a/setup.py
++++ b/setup.py
+@@ -152,6 +152,7 @@ class cmake_build_ext(build_ext):
+         verbose = envs.VERBOSE
+         if verbose:
+             cmake_args += ['-DCMAKE_VERBOSE_MAKEFILE=ON']
++            print(f"[DEBUG] VERBOSE: {cmake_args}")
+ 
+         if is_sccache_available():
+             cmake_args += [
+@@ -655,8 +656,8 @@ if _is_cuda():
+     ext_modules.append(CMakeExtension(name="vllm.vllm_flash_attn._vllm_fa2_C"))
+     if envs.VLLM_USE_PRECOMPILED or get_nvcc_cuda_version() >= Version("12.3"):
+         # FA3 requires CUDA 12.3 or later
+-        ext_modules.append(
+-            CMakeExtension(name="vllm.vllm_flash_attn._vllm_fa3_C"))
++        # ext_modules.append(
++        #     CMakeExtension(name="vllm.vllm_flash_attn._vllm_fa3_C"))
+         # Optional since this doesn't get built (produce an .so file) when
+         # not targeting a hopper system
+         ext_modules.append(
+diff --git a/vllm/engine/llm_engine.py b/vllm/engine/llm_engine.py
+index c23530990..55a279470 100644
+--- a/vllm/engine/llm_engine.py
++++ b/vllm/engine/llm_engine.py
+@@ -1409,8 +1409,15 @@ class LLMEngine:
+                     virtual_engine]
+ 
+             try:
++                # NVTX annotation to mark the start of model execution step
++                # torch.cuda.nvtx.mark("MODEL_EXECUTION_STEP_START")
++                
+                 outputs = self.model_executor.execute_model(
+                     execute_model_req=execute_model_req)
++                
++                # NVTX annotation to mark the end of model execution step
++                # torch.cuda.nvtx.mark("MODEL_EXECUTION_STEP_END")
++                
+                 self._skip_scheduling_next_step = False
+             except InputProcessingError as e:
+                 # The input for this request cannot be processed, so we must
+diff --git a/vllm/entrypoints/llm.py b/vllm/entrypoints/llm.py
+index 653e61a11..b8ef94079 100644
+--- a/vllm/entrypoints/llm.py
++++ b/vllm/entrypoints/llm.py
+@@ -1,5 +1,6 @@
+ # SPDX-License-Identifier: Apache-2.0
+-
++import torch
++import os
+ import itertools
+ import warnings
+ from collections.abc import Sequence
+@@ -470,7 +471,17 @@ class LLM:
+             guided_options=guided_options_request,
+             priority=priority)
+ 
++        # NVTX annotation to mark the start of overall LLM inference process
++        pid = os.getpid()
++        torch.cuda.nvtx.mark(f"nsys profiling start, pid: {pid}")
++        print(f"[INFO] nsys profiling start, pid: {pid}")
++        
+         outputs = self._run_engine(use_tqdm=use_tqdm)
++        
++        # NVTX annotation to mark the end of overall LLM inference process
++        torch.cuda.nvtx.mark(f"nsys profiling stopped, pid: {pid}")
++        print(f"[INFO] nsys profiling stopped, pid: {pid}")
++        
+         return self.engine_class.validate_outputs(outputs, RequestOutput)
+ 
+     def collective_rpc(self,
+diff --git a/vllm/env_override.py b/vllm/env_override.py
+index 71f031d1e..9c084aa0a 100644
+--- a/vllm/env_override.py
++++ b/vllm/env_override.py
+@@ -31,4 +31,4 @@ os.environ['PYTORCH_NVML_BASED_CUDA_CHECK'] = '1'
+ # see https://github.com/vllm-project/vllm/issues/10480
+ os.environ['TORCHINDUCTOR_COMPILE_THREADS'] = '1'
+ # see https://github.com/vllm-project/vllm/issues/10619
+-torch._inductor.config.compile_threads = 1
++# torch._inductor.config.compile_threads = 1
+diff --git a/vllm/worker/model_runner.py b/vllm/worker/model_runner.py
+index 73e0eff9a..794d6a0e9 100644
+--- a/vllm/worker/model_runner.py
++++ b/vllm/worker/model_runner.py
+@@ -8,6 +8,7 @@ import time
+ import weakref
+ from contextlib import contextmanager
+ from dataclasses import dataclass
++import os
+ from typing import (TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set,
+                     Tuple, Type, TypeVar, Union)
+ 
