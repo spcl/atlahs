@@ -134,6 +134,17 @@ Then build the 2.20.5 tree like a normal NCCL release, keeping `TRACING_FLAGS` e
 
 Run your workload under `nsys` with NVTX enabled (you can use any launcher: direct run, mpirun, srun, sbatch, etc.).
 
+If you **late-capture** with `--capture-range=cudaProfilerApi`, the NCCL INIT NVTX markers
+(ring/tree/comm init) will be missing from the SQLite output because NCCL initializes
+before `cudaProfilerStart()`. In that case, also enable NCCL INFO logs so GOAL generation
+can reconstruct the topology from text logs:
+
+```bash
+export NCCL_DEBUG=INFO
+export NCCL_DEBUG_SUBSYS=INIT,GRAPH
+export NCCL_DEBUG_FILE=/path/to/nccl_logs/nccl_%h_%p.log
+```
+
 Important: the NCCL 2.28 patch currently emits NVTX ranges in the **default NVTX domain** (i.e., it does not create/use a named `NCCL` domain). If you run `nsys` with `--nvtx-domain-include=NCCL`, you will filter these ranges out and ATLAHS will not see them. Omit `--nvtx-domain-include` unless you also change the patch to emit into a named domain.
 
 Typical flags that work well with ATLAHS post-processing:
@@ -205,6 +216,17 @@ python3 goal_gen/ai/nccl_goal_generator/get_traced_events.py \
    -i <trace_dir>/ -o <goal_dir>/ --unique-nic --merge-non-overlap \
    -l goal_gen/ai/nccl_goal_generator/npkit_benchmark_results/<platform>/npkit_data_summary_LL.json \
    -s goal_gen/ai/nccl_goal_generator/npkit_benchmark_results/<platform>/npkit_data_summary_Simple.json
+```
+
+If INIT NVTX is missing (late capture), add NCCL log reconstruction:
+
+```bash
+python3 goal_gen/ai/nccl_goal_generator/get_traced_events.py \
+   -i <trace_dir>/ -o <goal_dir>/ --unique-nic --merge-non-overlap \
+   -l goal_gen/ai/nccl_goal_generator/npkit_benchmark_results/<platform>/npkit_data_summary_LL.json \
+   -s goal_gen/ai/nccl_goal_generator/npkit_benchmark_results/<platform>/npkit_data_summary_Simple.json \
+   --nccl-debug-log-dir /path/to/nccl_logs \
+   --use-nccl-debug-topology
 ```
 
 `<platform>` should match one of the available directories under `goal_gen/ai/nccl_goal_generator/npkit_benchmark_results/` (e.g., `ault`, `clariden`, `play`).

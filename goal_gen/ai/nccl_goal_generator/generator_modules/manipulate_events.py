@@ -168,7 +168,10 @@ def get_events_parallel_group(nccl_events):
                                     'stepSize': coll_event['stepSize'],
                                     'elems': coll_event.get('elems', []),
                                     'ts_end': event['ts_end'],
-                                    'ts_kernel': event['ts_kernel'],
+                                    # Some late-capture traces (or inferred events) may not carry
+                                    # a specific kernel timestamp. Fall back to GPU start, then
+                                    # host start to keep grouping logic robust.
+                                    'ts_kernel': event.get('ts_kernel', event.get('ts_gpu_start', event.get('ts_start', 0))),
                                     'ts_gpu_start': event['ts_gpu_start'],
                                     'ts_gpu_end': event['ts_gpu_end']
                                 }
@@ -202,7 +205,7 @@ def get_events_parallel_group(nccl_events):
                                     'data_size': p2p_event['count'],
                                     'seq': p2p_event['seq'],
                                     'ts_end': event['ts_end'],
-                                    'ts_kernel': event['ts_kernel'],
+                                    'ts_kernel': event.get('ts_kernel', event.get('ts_gpu_start', event.get('ts_start', 0))),
                                     'ts_gpu_start': event['ts_gpu_start'],
                                     'ts_gpu_end': event['ts_gpu_end']
                                 }

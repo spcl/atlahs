@@ -4,6 +4,65 @@ from .utils import modRanks, div_up, get_event_type
 from .intra_node_gpu_transfer_time import get_intra_node_gpu_transfer_time
 from .reduction_copy_time import get_reduction_time, get_copy_time
 
+def _get_event_field(event, key, default=None):
+    """
+    Some traces use 'GroupColl' containers where 'algorithm'/'protocol'/etc live in
+    the first entry of event['coll_events'] rather than on the parent event.
+    """
+    if isinstance(event, dict) and key in event:
+        return event.get(key)
+    if isinstance(event, dict):
+        ce = event.get("coll_events")
+        if isinstance(ce, list) and len(ce) > 0 and isinstance(ce[0], dict) and key in ce[0]:
+            return ce[0].get(key)
+    return default
+
+def _get_or_synthesize_elems(event, comm_info, commId, gpuId, channel_info):
+    """
+    Fallback when per-channel kernel 'elems' payloads are missing: partition
+    (data_size/type_size) evenly across the available channels so the GOAL
+    pipeline can proceed.
+    """
+    elems = _get_event_field(event, "elems")
+    if elems is not None:
+        return elems
+
+    data_size = _get_event_field(event, "data_size")
+    type_size = _get_event_field(event, "type_size", 1)
+    if data_size is None:
+        return None
+
+    try:
+        data_size = int(data_size)
+    except Exception:
+        return None
+    try:
+        type_size = int(type_size) if type_size is not None else 1
+    except Exception:
+        type_size = 1
+    if type_size <= 0:
+        type_size = 1
+
+    nelem_total = max(0, data_size // type_size)
+    nch = len(channel_info) if channel_info else 1
+    base = nelem_total // nch
+    rem = nelem_total % nch
+    offset = 0
+    out = []
+    for ch in range(nch):
+        cnt = base + (1 if ch < rem else 0)
+        out.append({
+            "chunkCount": cnt,
+            "workOffset": offset,
+            "workCount": cnt,
+            "lastChunkCount": cnt,
+            "count": 0,
+            "sendbuff": 0,
+            "recvbuff": 0,
+        })
+        offset += cnt
+    return out
+
 def get_inter_node_microevents_dependency(nccl_group_events, comm_init_events, comm_info,
                                           SendRecvEvents_To_TaskCounter,
                                           goal_file_name, profile_interval={},
@@ -228,30 +287,36 @@ def get_inter_node_microevents_dependency(nccl_group_events, comm_init_events, c
                                     gpu_event_end_calc_id = task_counter     
 
                                     launched = 1
-
+                                
                                 if event['event_type'] == 'AllReduce':
-                                    algo = event['algorithm']  ## NCCL_ALGO_TREE: 0, NCCL_ALGO_RING: 1
-                                    proto = event['protocol']  ## NCCL_PROTO_LL: 0, NCCL_PROTO_LL128: 1, NCCL_PROTO_SIMPLE: 2
-                                    type_size = event['type_size']
-                                    chunkSteps = event['chunkSteps']
-                                    sliceSteps = event['sliceSteps']
-                                    stepSize = event['stepSize']
+                                    algo = _get_event_field(event, 'algorithm', '1')  ## NCCL_ALGO_TREE: 0, NCCL_ALGO_RING: 1
+                                    proto = _get_event_field(event, 'protocol', '2')  ## NCCL_PROTO_LL: 0, NCCL_PROTO_LL128: 1, NCCL_PROTO_SIMPLE: 2
+                                    type_size = _get_event_field(event, 'type_size', 1)
+                                    chunkSteps = _get_event_field(event, 'chunkSteps')
+                                    sliceSteps = _get_event_field(event, 'sliceSteps')
+                                    stepSize = _get_event_field(event, 'stepSize')
 
                                     if algo == '1': ## Ring
                                         ringIx = str(comm_info[commId]['gpuId_To_rank'][gpuId])  ## local rank index in the communicator
                                         channel_info = comm_info[commId]['rank_To_rankInfo'][ringIx]['channel_info']['Ring']
+                                        if not channel_info:
+                                            continue
 
-                                        elems = event['elems']
+                                        elems = _get_or_synthesize_elems(event, comm_info, commId, gpuId, channel_info)
+                                        if elems is None:
+                                            continue
                                         for channel_id, elem in enumerate(elems):
                                             send_index = {}
                                             recv_index = {}
 
                                             nranks = comm_info[event['commId']]['nranks']  ## 2
-                                            prevIx = str(channel_info[channel_id]['previous_rank'])  ## local rank index in the communicator
+                                            _nch = len(channel_info)
+                                            _ci = channel_info[channel_id % _nch]
+                                            prevIx = str(_ci['previous_rank'])  ## local rank index in the communicator
                                             recv_index[prevIx] = 0
                                             gpuId_prev = comm_info[commId]['rank_To_rankInfo'][prevIx]['gpuId']
                                             goal_rank_prev = comm_info[commId]['rank_To_rankInfo'][prevIx]['goal_rank']
-                                            nextIx = str(channel_info[channel_id]['next_rank'])  ## local rank index in the communicator
+                                            nextIx = str(_ci['next_rank'])  ## local rank index in the communicator
                                             send_index[nextIx] = 0
                                             gpuId_next = comm_info[commId]['rank_To_rankInfo'][nextIx]['gpuId']
                                             goal_rank_next = comm_info[commId]['rank_To_rankInfo'][nextIx]['goal_rank']
@@ -641,35 +706,41 @@ def get_inter_node_microevents_dependency(nccl_group_events, comm_init_events, c
                                     elif algo == '0': ## Tree AllReduce
                                         myIx = comm_info[commId]['gpuId_To_rank'][gpuId]  ## local rank index in the communicator
                                         channel_info = comm_info[commId]['rank_To_rankInfo'][myIx]['channel_info']['Tree']
+                                        if not channel_info:
+                                            continue
 
-                                        elems = event['elems']
+                                        elems = _get_or_synthesize_elems(event, comm_info, commId, gpuId, channel_info)
+                                        if elems is None:
+                                            continue
                                         for channel_id, elem in enumerate(elems):
                                             send_index = {}
                                             recv_index = {}
 
                                             nranks = comm_info[event['commId']]['nranks']  ## 2
-                                            child_1_Ix = channel_info[channel_id]['child_1_rank']  ## local rank index in the communicator
+                                            _nch = len(channel_info)
+                                            _ci = channel_info[channel_id % _nch]
+                                            child_1_Ix = _ci['child_1_rank']  ## local rank index in the communicator
                                             if child_1_Ix != '-1':
                                                 send_index[child_1_Ix] = 0
                                                 recv_index[child_1_Ix] = 0
                                                 gpuId_child_1 = comm_info[commId]['rank_To_rankInfo'][child_1_Ix]['gpuId']
                                                 goal_rank_child_1 = comm_info[commId]['rank_To_rankInfo'][child_1_Ix]['goal_rank']
 
-                                            child_2_Ix = channel_info[channel_id]['child_2_rank']  ## local rank index in the communicator
+                                            child_2_Ix = _ci['child_2_rank']  ## local rank index in the communicator
                                             if child_2_Ix != '-1':
                                                 send_index[child_2_Ix] = 0
                                                 recv_index[child_2_Ix] = 0
                                                 gpuId_child_2 = comm_info[commId]['rank_To_rankInfo'][child_2_Ix]['gpuId']
                                                 goal_rank_child_2 = comm_info[commId]['rank_To_rankInfo'][child_2_Ix]['goal_rank']
 
-                                            child_3_Ix = channel_info[channel_id]['child_3_rank']  ## local rank index in the communicator
+                                            child_3_Ix = _ci['child_3_rank']  ## local rank index in the communicator
                                             if child_3_Ix != '-1':
                                                 send_index[child_3_Ix] = 0
                                                 recv_index[child_3_Ix] = 0
                                                 gpuId_child_3 = comm_info[commId]['rank_To_rankInfo'][child_3_Ix]['gpuId']
                                                 goal_rank_child_3 = comm_info[commId]['rank_To_rankInfo'][child_3_Ix]['goal_rank']
                                                 
-                                            parent_Ix = channel_info[channel_id]['parent_rank']  ## local rank index in the communicator
+                                            parent_Ix = _ci['parent_rank']  ## local rank index in the communicator
                                             if parent_Ix != '-1':
                                                 send_index[parent_Ix] = 0
                                                 recv_index[parent_Ix] = 0
@@ -1013,30 +1084,36 @@ def get_inter_node_microevents_dependency(nccl_group_events, comm_init_events, c
                                                                     break
 
                                 elif event['event_type'] == 'Broadcast':
-                                    algo = event['algorithm']  ## NCCL_ALGO_TREE: 0, NCCL_ALGO_RING: 1, broadcast only has Ring
-                                    proto = event['protocol']  ## NCCL_PROTO_LL: 0, NCCL_PROTO_LL128: 1, NCCL_PROTO_SIMPLE: 2
+                                    algo = _get_event_field(event, 'algorithm', '1')  ## NCCL_ALGO_TREE: 0, NCCL_ALGO_RING: 1, broadcast only has Ring
+                                    proto = _get_event_field(event, 'protocol', '2')  ## NCCL_PROTO_LL: 0, NCCL_PROTO_LL128: 1, NCCL_PROTO_SIMPLE: 2
                                     
-                                    root_rank = event['root_rank']
+                                    root_rank = _get_event_field(event, 'root_rank', 0)
 
-                                    type_size = event['type_size']
-                                    chunkSteps = event['chunkSteps']
-                                    sliceSteps = event['sliceSteps']
-                                    stepSize = event['stepSize']
+                                    type_size = _get_event_field(event, 'type_size', 1)
+                                    chunkSteps = _get_event_field(event, 'chunkSteps')
+                                    sliceSteps = _get_event_field(event, 'sliceSteps')
+                                    stepSize = _get_event_field(event, 'stepSize')
 
                                     ringIx = str(comm_info[commId]['gpuId_To_rank'][gpuId])  ## local rank index in the communicator
                                     channel_info = comm_info[commId]['rank_To_rankInfo'][ringIx]['channel_info']['Ring']
+                                    if not channel_info:
+                                        continue
 
-                                    elems = event['elems']
+                                    elems = _get_or_synthesize_elems(event, comm_info, commId, gpuId, channel_info)
+                                    if elems is None:
+                                        continue
                                     for channel_id, elem in enumerate(elems):
                                         send_index = {}
                                         recv_index = {}
 
                                         nranks = comm_info[event['commId']]['nranks']  ## 2
-                                        prevIx = str(channel_info[channel_id]['previous_rank'])  ## local rank index in the communicator
+                                        _nch = len(channel_info)
+                                        _ci = channel_info[channel_id % _nch]
+                                        prevIx = str(_ci['previous_rank'])  ## local rank index in the communicator
                                         recv_index[prevIx] = 0
                                         gpuId_prev = comm_info[commId]['rank_To_rankInfo'][prevIx]['gpuId']
                                         goal_rank_prev = comm_info[commId]['rank_To_rankInfo'][prevIx]['goal_rank']
-                                        nextIx = str(channel_info[channel_id]['next_rank'])  ## local rank index in the communicator
+                                        nextIx = str(_ci['next_rank'])  ## local rank index in the communicator
                                         send_index[nextIx] = 0
                                         gpuId_next = comm_info[commId]['rank_To_rankInfo'][nextIx]['gpuId']
                                         goal_rank_next = comm_info[commId]['rank_To_rankInfo'][nextIx]['goal_rank']
@@ -1272,28 +1349,34 @@ def get_inter_node_microevents_dependency(nccl_group_events, comm_init_events, c
                                                                 break
 
                                 elif event['event_type'] == 'AllGather':
-                                    algo = event['algorithm']  ## NCCL_ALGO_TREE: 0, NCCL_ALGO_RING: 1
-                                    proto = event['protocol']  ## NCCL_PROTO_LL: 0, NCCL_PROTO_LL128: 1, NCCL_PROTO_SIMPLE: 2
-                                    type_size = event['type_size']
-                                    chunkSteps = event['chunkSteps']
-                                    sliceSteps = event['sliceSteps']
-                                    stepSize = event['stepSize']
+                                    algo = _get_event_field(event, 'algorithm', '1')  ## NCCL_ALGO_TREE: 0, NCCL_ALGO_RING: 1
+                                    proto = _get_event_field(event, 'protocol', '2')  ## NCCL_PROTO_LL: 0, NCCL_PROTO_LL128: 1, NCCL_PROTO_SIMPLE: 2
+                                    type_size = _get_event_field(event, 'type_size', 1)
+                                    chunkSteps = _get_event_field(event, 'chunkSteps')
+                                    sliceSteps = _get_event_field(event, 'sliceSteps')
+                                    stepSize = _get_event_field(event, 'stepSize')
 
                                     # if algo == '1': ## Ring AllGather
                                     ringIx = str(comm_info[commId]['gpuId_To_rank'][gpuId])  ## local rank index in the communicator
                                     channel_info = comm_info[commId]['rank_To_rankInfo'][ringIx]['channel_info']['Ring']
+                                    if not channel_info:
+                                        continue
 
-                                    elems = event['elems']
+                                    elems = _get_or_synthesize_elems(event, comm_info, commId, gpuId, channel_info)
+                                    if elems is None:
+                                        continue
                                     for channel_id, elem in enumerate(elems):
                                         send_index = {}
                                         recv_index = {}
 
                                         nranks = comm_info[event['commId']]['nranks']
-                                        prevIx = str(channel_info[channel_id]['previous_rank'])  ## local rank index in the communicator
+                                        _nch = len(channel_info)
+                                        _ci = channel_info[channel_id % _nch]
+                                        prevIx = str(_ci['previous_rank'])  ## local rank index in the communicator
                                         recv_index[prevIx] = 0
                                         gpuId_prev = comm_info[commId]['rank_To_rankInfo'][prevIx]['gpuId']
                                         goal_rank_prev = comm_info[commId]['rank_To_rankInfo'][prevIx]['goal_rank']
-                                        nextIx = str(channel_info[channel_id]['next_rank'])  ## local rank index in the communicator
+                                        nextIx = str(_ci['next_rank'])  ## local rank index in the communicator
                                         send_index[nextIx] = 0
                                         gpuId_next = comm_info[commId]['rank_To_rankInfo'][nextIx]['gpuId']
                                         goal_rank_next = comm_info[commId]['rank_To_rankInfo'][nextIx]['goal_rank']
@@ -2000,18 +2083,24 @@ def get_inter_node_microevents_dependency(nccl_group_events, comm_init_events, c
 
                         for event in group_event['events']:
                             if event['event_type'] == 'AllReduce' or event['event_type'] == 'Broadcast' or event['event_type'] == 'AllGather' or event['event_type'] == 'ReduceScatter' or event['event_type'] == 'Reduce':
-                                algo = event['algorithm']
+                                algo = _get_event_field(event, 'algorithm', '1')
                                 if algo == '1':  ## Ring
                                     commId = event['commId']
                                     ringIx = str(comm_info[commId]['gpuId_To_rank'][gpuId])  ## local rank index in the communicator
                                     channel_info = comm_info[commId]['rank_To_rankInfo'][ringIx]['channel_info']['Ring']
+                                    if not channel_info:
+                                        continue
 
-                                    elems = event['elems']
+                                    elems = _get_or_synthesize_elems(event, comm_info, commId, gpuId, channel_info)
+                                    if elems is None:
+                                        continue
                                     for channel_id, elem in enumerate(elems):
-                                        prevIx = str(channel_info[channel_id]['previous_rank'])  ## local rank index in the communicator
+                                        _nch = len(channel_info)
+                                        _ci = channel_info[channel_id % _nch]
+                                        prevIx = str(_ci['previous_rank'])  ## local rank index in the communicator
                                         gpuId_prev = comm_info[commId]['rank_To_rankInfo'][prevIx]['gpuId']
                                         goal_rank_prev = comm_info[commId]['rank_To_rankInfo'][prevIx]['goal_rank']
-                                        nextIx = str(channel_info[channel_id]['next_rank'])  ## local rank index in the communicator
+                                        nextIx = str(_ci['next_rank'])  ## local rank index in the communicator
                                         gpuId_next = comm_info[commId]['rank_To_rankInfo'][nextIx]['gpuId']
                                         goal_rank_next = comm_info[commId]['rank_To_rankInfo'][nextIx]['goal_rank']
 
@@ -2050,16 +2139,28 @@ def get_inter_node_microevents_dependency(nccl_group_events, comm_init_events, c
                                     commId = event['commId']
                                     myIx = comm_info[commId]['gpuId_To_rank'][gpuId]  ## local rank index in the communicator
                                     channel_info = comm_info[commId]['rank_To_rankInfo'][myIx]['channel_info']['Tree']
+                                    if not channel_info:
+                                        continue
 
-                                    elems = event['elems']
+                                    elems = _get_or_synthesize_elems(event, comm_info, commId, gpuId, channel_info)
+                                    if elems is None:
+                                        continue
                                     for channel_id, elem in enumerate(elems):
-                                        child_1_Ix = channel_info[channel_id]['child_1_rank']  ## local rank index in the communicator
+                                        _nch = len(channel_info)
+                                        _ci = channel_info[channel_id % _nch]
+                                        child_1_Ix = _ci['child_1_rank']  ## local rank index in the communicator
                                         if child_1_Ix != '-1':
                                             gpuId_child_1 = comm_info[commId]['rank_To_rankInfo'][child_1_Ix]['gpuId']
                                             goal_rank_child_1 = comm_info[commId]['rank_To_rankInfo'][child_1_Ix]['goal_rank']
                                             
-                                            my_event_task_counter = SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId][event['event_type']][event['seq']][channel_id]['recv'][child_1_Ix]
-                                            child_1_event_task_counter = SendRecvEvents_To_TaskCounter[goal_rank_child_1][gpuId_child_1][commId][event['event_type']][event['seq']][channel_id]['send'][myIx]
+                                            try:
+                                                my_event_task_counter = SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId][event['event_type']][event['seq']][channel_id]['recv'][child_1_Ix]
+                                                child_1_event_task_counter = SendRecvEvents_To_TaskCounter[goal_rank_child_1][gpuId_child_1][commId][event['event_type']][event['seq']][channel_id]['send'][myIx]
+                                            except KeyError:
+                                                # Late-capture traces (or aggressively clamped profiling windows)
+                                                # can drop some send/recv microevents, which would otherwise crash
+                                                # dependency generation. Skip missing edges.
+                                                continue
 
                                             if goal_rank_child_1 == goal_rank and intra_mode != "off":
                                                 if intra_mode != "acyclic_gpu" or int(gpuId_child_1) < int(gpuId):
@@ -2068,13 +2169,16 @@ def get_inter_node_microevents_dependency(nccl_group_events, comm_init_events, c
                                                         child_1_send_task_counter = child_1_event_task_counter[i]
                                                         file.write(f"l{int(my_receive_task_counter)} requires l{int(child_1_send_task_counter)}\n")
 
-                                        child_2_Ix = channel_info[channel_id]['child_2_rank']  ## local rank index in the communicator
+                                        child_2_Ix = _ci['child_2_rank']  ## local rank index in the communicator
                                         if child_2_Ix != '-1':
                                             gpuId_child_2 = comm_info[commId]['rank_To_rankInfo'][child_2_Ix]['gpuId']
                                             goal_rank_child_2 = comm_info[commId]['rank_To_rankInfo'][child_2_Ix]['goal_rank']
 
-                                            my_event_task_counter = SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId][event['event_type']][event['seq']][channel_id]['recv'][child_2_Ix]
-                                            child_2_event_task_counter = SendRecvEvents_To_TaskCounter[goal_rank_child_2][gpuId_child_2][commId][event['event_type']][event['seq']][channel_id]['send'][myIx]
+                                            try:
+                                                my_event_task_counter = SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId][event['event_type']][event['seq']][channel_id]['recv'][child_2_Ix]
+                                                child_2_event_task_counter = SendRecvEvents_To_TaskCounter[goal_rank_child_2][gpuId_child_2][commId][event['event_type']][event['seq']][channel_id]['send'][myIx]
+                                            except KeyError:
+                                                continue
 
                                             if goal_rank_child_2 == goal_rank and intra_mode != "off":
                                                 if intra_mode != "acyclic_gpu" or int(gpuId_child_2) < int(gpuId):
@@ -2083,13 +2187,16 @@ def get_inter_node_microevents_dependency(nccl_group_events, comm_init_events, c
                                                         child_2_send_task_counter = child_2_event_task_counter[i]
                                                         file.write(f"l{int(my_receive_task_counter)} requires l{int(child_2_send_task_counter)}\n")
                                         
-                                        child_3_Ix = channel_info[channel_id]['child_3_rank']  ## local rank index in the communicator
+                                        child_3_Ix = _ci['child_3_rank']  ## local rank index in the communicator
                                         if child_3_Ix != '-1':
                                             gpuId_child_3 = comm_info[commId]['rank_To_rankInfo'][child_3_Ix]['gpuId']
                                             goal_rank_child_3 = comm_info[commId]['rank_To_rankInfo'][child_3_Ix]['goal_rank']
 
-                                            my_event_task_counter = SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId][event['event_type']][event['seq']][channel_id]['recv'][child_3_Ix]
-                                            child_3_event_task_counter = SendRecvEvents_To_TaskCounter[goal_rank_child_3][gpuId_child_3][commId][event['event_type']][event['seq']][channel_id]['send'][myIx]
+                                            try:
+                                                my_event_task_counter = SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId][event['event_type']][event['seq']][channel_id]['recv'][child_3_Ix]
+                                                child_3_event_task_counter = SendRecvEvents_To_TaskCounter[goal_rank_child_3][gpuId_child_3][commId][event['event_type']][event['seq']][channel_id]['send'][myIx]
+                                            except KeyError:
+                                                continue
 
                                             if goal_rank_child_3 == goal_rank and intra_mode != "off":
                                                 if intra_mode != "acyclic_gpu" or int(gpuId_child_3) < int(gpuId):
@@ -2103,8 +2210,11 @@ def get_inter_node_microevents_dependency(nccl_group_events, comm_init_events, c
                                             gpuId_parent = comm_info[commId]['rank_To_rankInfo'][parent_Ix]['gpuId']
                                             goal_rank_parent = comm_info[commId]['rank_To_rankInfo'][parent_Ix]['goal_rank']
 
-                                            my_event_task_counter = SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId][event['event_type']][event['seq']][channel_id]['recv'][parent_Ix]
-                                            parent_event_task_counter = SendRecvEvents_To_TaskCounter[goal_rank_parent][gpuId_parent][commId][event['event_type']][event['seq']][channel_id]['send'][myIx]
+                                            try:
+                                                my_event_task_counter = SendRecvEvents_To_TaskCounter[goal_rank][gpuId][commId][event['event_type']][event['seq']][channel_id]['recv'][parent_Ix]
+                                                parent_event_task_counter = SendRecvEvents_To_TaskCounter[goal_rank_parent][gpuId_parent][commId][event['event_type']][event['seq']][channel_id]['send'][myIx]
+                                            except KeyError:
+                                                continue
 
                                             if goal_rank_parent == goal_rank and intra_mode != "off":
                                                 if intra_mode != "acyclic_gpu" or int(gpuId_parent) < int(gpuId):
