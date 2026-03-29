@@ -168,6 +168,10 @@
    const double G=args_info.LogGOPS_G_arg;
    print=args_info.verbose_given;
    const uint32_t S=args_info.LogGOPS_S_arg;
+  const int ranks_per_node = args_info.ranks_per_node_arg;
+  const int L_intra = (args_info.LogGOPS_L_intra_arg >= 0) ? args_info.LogGOPS_L_intra_arg : L;
+  const double G_intra = (args_info.LogGOPS_G_intra_arg >= 0) ? args_info.LogGOPS_G_intra_arg : G;
+  int debug_intra_count = 0, debug_inter_count = 0;
    // if (args_info.comm_dep_file_given)
    //   std::cout << "[DEBUG] Comm dep file: " << args_info.comm_dep_file_arg << std::endl;
    Parser parser(args_info.filename_arg, args_info.save_mem_given);
@@ -177,8 +181,8 @@
    const int ncpus = parser.GetNumCPU();
    const int nnics = parser.GetNumNIC();
  
-   printf("size: %i (%i CPUs, %i NICs); L=%i, o=%i g=%i, G=%f, O=%i, P=%i, S=%u\n", 
-          p, ncpus, nnics, L, o, g, G, O, p, S);
+   printf("size: %i (%i CPUs, %i NICs); L=%i, o=%i g=%i, G=%f, O=%i, P=%i, S=%u, L_intra=%i, G_intra=%f, ranks_per_node=%i\n", 
+          p, ncpus, nnics, L, o, g, G, O, p, S, L_intra, G_intra, ranks_per_node);
  
    TimelineVisualization tlviz(&args_info, p);
    Noise osnoise(&args_info, p);
@@ -349,10 +353,26 @@
              parser.schedules[elem.host].MarkNodeAsStarted(elem.offset);
              // check_hosts.push_back(elem.host);
              check_hosts.insert(elem.host);
-             // FIXME: this is a hack to make sure that the size is at least 1
-             if (elem.size == 0)
-               elem.size = 1;
-             
+             // Handle 0-byte sends as lightweight dependency markers
+             // (e.g., intra-node transfers already modeled as calc in GOAL)
+             if (elem.size == 0) {
+               // Skip NIC serialization for 0B sends - just forward as dependency
+               parser.schedules[elem.host].MarkNodeAsStarted(elem.offset);
+               check_hosts.insert(elem.host);
+               uint64_t cpu_time = elem.time + o;
+               nexto[elem.host][elem.proc] = cpu_time;
+               // Don't update nextgs (no NIC usage for 0B)
+               elem.type = OP_MSG;
+               int h = elem.host;
+               elem.host = elem.target;
+               elem.target = h;
+               elem.starttime = elem.time;
+               elem.time = cpu_time + 3700; // minimal wire delay (100ns)
+               elem.size = 1; // for downstream processing
+               aq.push(elem);
+               parser.schedules[h].MarkNodeAsDone(elem.offset, cpu_time);
+               break;
+             }
              assert(elem.size > 0);
              // check if OS Noise occurred
              btime_t noise = osnoise.get_noise(elem.host, elem.time, elem.time+o);
@@ -363,7 +383,12 @@
              message_sizes.push_back(elem.size);
              
              // std::cout << "[DEBUG] HOST: " << elem.host << " Send offset: " << elem.offset << " cpu: " << unsigned(elem.proc) << " Time: " << elem.time / 1e9 << " Size (b): " << elem.size << " NextO: " << nexto[elem.host][elem.proc] / 1e9 << std::endl;
-             uint64_t bandwidth_cost = static_cast<uint64_t>((elem.size-1) * G);
+             // Intra/inter-node awareness: use different L and G for same-node transfers
+             bool is_intra = (ranks_per_node > 0) && (elem.host / ranks_per_node == elem.target / ranks_per_node);
+             if (is_intra) debug_intra_count++; else debug_inter_count++;
+             double effective_G = is_intra ? G_intra : G;
+             int effective_L = is_intra ? L_intra : L;
+             uint64_t bandwidth_cost = static_cast<uint64_t>((elem.size-1) * effective_G);
              nextgs[elem.host][elem.nic] = elem.time + g + bandwidth_cost; // TODO: G should be charged in network layer only
              
              uint64_t host_time = nexto[elem.host][elem.proc];
@@ -374,6 +399,7 @@
              
              tlviz.add_osend(elem.host, elem.time, elem.time+o+ (elem.size-1)*O, elem.proc);
              tlviz.add_noise(elem.host, elem.time+o+ (elem.size-1)*O, elem.time + o + (elem.size-1)*O+ noise, elem.proc);
+             tlviz.add_nsend(elem.host, elem.nic, elem.time, nextgs[elem.host][elem.nic], elem.offset, elem.size);
  
              // insert packet into network layer
              // net.insert(elem.time, elem.host, elem.target, elem.size, &elem.handle);
@@ -384,7 +410,7 @@
              elem.target = h;
              elem.starttime = elem.time;
              // arrival time of first byte only (G will be charged at receiver ... +(elem.size-1)*G; // arrival time
-             elem.time = host_time + L + bandwidth_cost;
+             elem.time = host_time + effective_L + bandwidth_cost;
  
    #ifdef STRICT_ORDER
              num_events++; // MSG is a new event
@@ -648,6 +674,7 @@
                  tlviz.add_noise(elem.host,
                                  elem.time + o + std::max((elem.size-1) * O, static_cast<uint64_t>((elem.size - 1) * G)),
                                  elem.time + o + noise + std::max((elem.size-1)*O, static_cast<uint64_t>((elem.size - 1) * G)), elem.proc);
+                 tlviz.add_nrecv(elem.host, elem.nic, elem.time, nic_time, matched_elem.offset, elem.size);
                  // satisfy local requires
                  parser.schedules[elem.host].MarkNodeAsDone(matched_elem.offset, cpu_time);
  
@@ -809,6 +836,7 @@
  #ifndef STRICT_ORDER
    ulint aqtime=0;
  #endif
+  printf("Intra-node sends: %d, Inter-node sends: %d\n", debug_intra_count, debug_inter_count);
    printf("PERFORMANCE: Processes: %i \t Events: %lu \t Time: %lu s \t Speed: %.2f ev/s\n", p, (long unsigned int)aqtime, (long unsigned int)diff, (float)aqtime/(float)diff);
  
 
