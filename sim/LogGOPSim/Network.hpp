@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include <fstream>
 #include <regex>
+#include <cstring>
 
 #define noorder 1
 #define debug 0
