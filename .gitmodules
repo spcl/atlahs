@@ -45,7 +45,7 @@
 	url = https://github.com/vllm-project/vllm.git
 [submodule "goal_gen/ai/nccl_generator_v2"]
 	path = goal_gen/ai/nccl_generator_v2
-	url = git@github.com:Yanksi/nccl_generator_v2.git
+	url = https://github.com/Yanksi/nccl_generator_v2.git
 [submodule "goal_gen/ai/nccl_versions/nccl_nvtx_v2.20.5"]
 	path = goal_gen/ai/nccl_versions/nccl_nvtx_v2.20.5
 	url = https://github.com/ZhiyiHu1999/nccl_nvtx_v2.20.5-1.git

@@ -40,7 +40,7 @@ class TimelineVisualization {
 
 	public:
 
-  TimelineVisualization(gengetopt_args_info *args_info, int p) : enable(enable) {
+  TimelineVisualization(gengetopt_args_info *args_info, int p) : enable(false) {
     enable = args_info->vizfile_given;
     if(!enable) return;
 

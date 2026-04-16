@@ -21,15 +21,15 @@ fi
 # Clean up
 make clean
 
-# Add '-fPIC'
-echo "[INFO] Inserting '-fPIC' into Makefile"
-sed -i 's/CFLAGS = -g -O2 -Wno-missing-prototypes/CFLAGS = -g -O2 -Wno-missing-prototypes -fPIC/' Makefile
+# Add '-fPIC' and re-enable removed MPI-1 declarations for OpenMPI >= 4.
+echo "[INFO] Inserting '-fPIC -DOMPI_OMIT_MPI1_COMPAT_DECLS=0' into Makefile"
+sed -i 's/CFLAGS = -g -O2 -Wno-missing-prototypes/CFLAGS = -g -O2 -Wno-missing-prototypes -fPIC -DOMPI_OMIT_MPI1_COMPAT_DECLS=0/' Makefile
 
 
 if [ $? -ne 0 ]
 then
     # If search & replace fails
-    echo "[ERROR] Failed to insert '-fPIC' into Makefile"
+    echo "[ERROR] Failed to insert compiler flags into Makefile"
     exit 1
 fi
 
