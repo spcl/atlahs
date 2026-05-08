@@ -378,6 +378,14 @@ int start_lgs(std::string filename_goal, LogSimInterface &lgs) {
     const uint p = parser.schedules.size();
     const int ncpus = parser.GetNumCPU();
     const int nnics = parser.GetNumNIC();
+    lgs_interface->htsim_api->setGoalRankMappingFromBinaryHeader(
+        static_cast<uint32_t>(p), ncpus, nnics);
+    printf("[ATLAHS] GOAL rank mapping: %s (LGS ranks=%u, CPUs=%d, NICs=%d, HTSIM nodes=%u)\n",
+           lgs_interface->htsim_api->getGoalRankMappingName(),
+           p,
+           ncpus,
+           nnics,
+           lgs_interface->htsim_api->usesUniqueNicRankMapping() ? p * nnics : p);
     bool comm_dep_file_arg = false;
 
     // DATA structures for storing MPI matching statistics
@@ -492,7 +500,6 @@ int start_lgs(std::string filename_goal, LogSimInterface &lgs) {
     bool comm_dep_file_given = false;
     bool qstat_arg = false; 
     bool batchmode_given = false;
-    lgs_interface->htsim_api->setNumberNic(nnics);
     bool progress_given = true;
 
     

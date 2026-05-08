@@ -44,6 +44,11 @@ public:
 
 class AtlahsHtsimApi : public AtlahsApi {
 public:
+    enum class GoalRankMapping {
+        GpuRank,
+        UniqueNic,
+    };
+
     AtlahsHtsimApi() = default;
     virtual ~AtlahsHtsimApi() = default;
     
@@ -112,6 +117,37 @@ public:
     void setNumberNic(int nic) { number_nics = nic; }
     int getNumberNic() const { return number_nics; }
 
+    void setGoalRankMapping(GoalRankMapping mapping) { goal_rank_mapping = mapping; }
+    GoalRankMapping getGoalRankMapping() const { return goal_rank_mapping; }
+
+    void setGoalRankMappingFromBinaryHeader(uint32_t rank_count, int cpu_count, int nic_count) {
+        setNumberNic(nic_count);
+
+        // The binary GOAL format does not store the generator version. Infer
+        // the layout from the parsed schedule header instead: V1 unique-nic
+        // files keep ranks at node granularity and use several NICs per rank,
+        // while V2 files keep ranks at GPU/HTSIM-node granularity.
+        const bool looks_like_v2_gpu_rank =
+            nic_count == 1 ||
+            (nic_count == 2 && rank_count > static_cast<uint32_t>(nic_count) && cpu_count <= 8);
+        goal_rank_mapping =
+            looks_like_v2_gpu_rank ? GoalRankMapping::GpuRank : GoalRankMapping::UniqueNic;
+    }
+
+    bool usesUniqueNicRankMapping() const {
+        return goal_rank_mapping == GoalRankMapping::UniqueNic;
+    }
+
+    const char* getGoalRankMappingName() const {
+        switch (goal_rank_mapping) {
+            case GoalRankMapping::UniqueNic:
+                return "unique-nic";
+            case GoalRankMapping::GpuRank:
+                return "gpu-rank";
+        }
+        return "unknown";
+    }
+
     void setNumberNacks(int nacks) { number_of_nacks += nacks; }
     uint64_t getNumberNacks() const { return number_of_nacks; }
 
@@ -119,7 +155,7 @@ public:
     simtime_picosec getGlobalTimeNs() const { return _eventlist->now() / 1000; }
 
     int getHtsimNodeNumber(int lgs_host, int lgs_nic) {
-        return lgs_host * number_nics + lgs_nic;
+        return usesUniqueNicRankMapping() ? lgs_host * number_nics + lgs_nic : lgs_host;
     }
 
     linkspeed_bps linkspeed; // TO DO
@@ -141,6 +177,7 @@ private:
 
     // LGS Specific
     int number_nics = 1;
+    GoalRankMapping goal_rank_mapping = GoalRankMapping::GpuRank;
 
     // EQDS Specific 
     vector<EqdsPullPacer*> pacersEQDS;
