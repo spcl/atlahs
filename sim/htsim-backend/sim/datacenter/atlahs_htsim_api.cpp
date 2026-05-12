@@ -16,10 +16,8 @@ void AtlahsHtsimApi::Send(const SendEvent &event, graph_node_properties elem) {
     int size = event.getSizeBytes();
     size = size * 1;
 
-    if (getNumberNic() > 1) {
-        from = getHtsimNodeNumber(from, elem.nic);
-        to = getHtsimNodeNumber(to, elem.nic);
-    }
+    from = getHtsimNodeNumber(from, elem.nic);
+    to = getHtsimNodeNumber(to, elem.nic);
 
     // Temporary solution
     if (llama_rand) {
