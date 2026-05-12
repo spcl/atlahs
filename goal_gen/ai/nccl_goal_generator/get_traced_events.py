@@ -55,6 +55,29 @@ def main():
     parser.add_argument('--zero-red-copy', action='store_true', help='Whether to set all the reduction copy time to zero')
     parser.add_argument('--merge-non-overlap', action='store_true', help='Whether to merge non-overlapping events for all streams if possible')
     parser.add_argument("--unique-nic", action='store_true', help="Whether to assign a separate NIC ID for each GPU in GOAL")
+    parser.add_argument(
+        "--nccl-debug-log-dir",
+        type=str,
+        default=None,
+        help=(
+            "Directory containing NCCL debug logs (e.g., produced via NCCL_DEBUG_FILE). "
+            "If provided, ATLAHS can reconstruct missing INIT topology (Rings/Trees/CommInit) from logs."
+        ),
+    )
+    parser.add_argument(
+        "--nccl-debug-log-glob",
+        type=str,
+        default=None,
+        help=(
+            "Glob pattern for NCCL debug logs (overrides --nccl-debug-log-dir). "
+            "Example: /path/to/nccl_*.log"
+        ),
+    )
+    parser.add_argument(
+        "--use-nccl-debug-topology",
+        action="store_true",
+        help="Prefer topology parsed from NCCL debug logs over synthetic topology when INIT NVTX markers are missing.",
+    )
     args = parser.parse_args()
 
     if args.no_intermediate_output:
@@ -68,8 +91,16 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    nccl_log_glob = args.nccl_debug_log_glob
+    if nccl_log_glob is None and args.nccl_debug_log_dir is not None:
+        nccl_log_glob = os.path.join(args.nccl_debug_log_dir, "*")
+
     Comm_Init_Events, NCCL_Events, CUPTI_Kernel_Results, Comm_Info, \
-        HostName_To_GoalRank, profile_interval = get_nsys_events(Dir_Path)  ## nccl_events, cupti_kernel_results, comm_info, HostName_To_GoalRank
+        HostName_To_GoalRank, profile_interval = get_nsys_events(
+            Dir_Path,
+            nccl_debug_log_glob=nccl_log_glob,
+            use_nccl_debug_topology=args.use_nccl_debug_topology,
+        )  ## nccl_events, cupti_kernel_results, comm_info, HostName_To_GoalRank
     
     if args.merge_non_overlap:
         NCCL_Events, CUPTI_Kernel_Results = merge_stream_if_no_overlap(NCCL_Events, CUPTI_Kernel_Results)

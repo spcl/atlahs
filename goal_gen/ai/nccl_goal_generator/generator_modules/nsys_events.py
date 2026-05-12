@@ -1,6 +1,7 @@
 import argparse
 import yaml
 import os
+import glob
 import json
 import math
 import sqlite3
@@ -12,7 +13,186 @@ from collections import defaultdict
 from queue import Queue
 
 #### Postprocessing nsys files
-def get_nsys_events(dir_path):
+def _parse_nccl_debug_topology_from_logs(log_glob: str) -> Dict[str, Dict[str, object]]:
+    """
+    Best-effort parser for NCCL DEBUG/INFO logs to reconstruct init/topology metadata
+    when NVTX INIT markers are missing from the trace (e.g., due to late tracing).
+
+    Expected (substrings) in logs (format varies by NCCL version/build).
+    Two common styles are supported:
+
+    (A) NVTX-like debug lines (some patched builds):
+      - commHash <H> commId <C> rank <r> nranks <n>
+      - commHash <H> Rings [<ch>] <prev>-><me>-><next>
+      - commHash <H> Trees [<ch>] <c1>/<c2>/<c3>-><me>-><parent>
+
+    (B) Standard NCCL INFO lines:
+      - ncclCommInitRank... rank <r> nranks <n> ... commId <C> - Init START/COMPLETE
+      - Ring <ch> : <prev> -> <me> -> <next>
+      - Trees [<ch>] <c1>/<c2>/<c3>-><me>-><parent>
+
+    Returns:
+      topo_by_id[commId_or_commHash] = {
+        'nranks': int,
+        # Optional mapping only available for standard NCCL INFO logs when the
+        # log filename encodes host+pid (e.g., NCCL_DEBUG_FILE=".../nccl_%h_%p.log").
+        # Keys are (host, pid) tuples with pid as int.
+        'pid_to_rank': {(host_str, pid_int): rank_int},
+        'ring': {(rank_str, ch_str): {'previous_rank': str, 'my_rank': str, 'next_rank': str, 'channel_Id': str}},
+        'tree': {(rank_str, ch_str): {'child_1_rank': str, 'child_2_rank': str, 'child_3_rank': str, 'my_rank': str, 'parent_rank': str, 'channel_Id': str}},
+      }
+    """
+    if not log_glob:
+        return {}
+
+    # Expand glob and keep only regular files.
+    paths = [p for p in glob.glob(log_glob) if os.path.isfile(p)]
+    if len(paths) == 0:
+        return {}
+
+    # (A) NVTX-like patterns.
+    re_comm_a = re.compile(r"commHash (\S+) commId (\S+) rank (\d+) nranks (\d+)")
+    re_ring_a = re.compile(r"commHash (\S+) Rings \[(\d+)\] (\d+)->(\d+)->(\d+)")
+    re_tree_a = re.compile(r"commHash (\S+) Trees \[(\d+)\] (-?\d+)/(-?\d+)/(-?\d+)->(-?\d+)->(-?\d+)")
+
+    # (B) Standard NCCL INFO patterns.
+    re_init_b = re.compile(r"\brank (\d+)\s+nranks (\d+).*\bcommId (0x[0-9a-fA-F]+)\b.*- Init (START|COMPLETE)")
+    re_ring_b = re.compile(r"\bRing\s+(\d+)\s*:\s*(\d+)\s*->\s*(\d+)\s*->\s*(\d+)")
+    re_tree_b = re.compile(r"\bTrees\s*\[(\d+)\]\s+(-?\d+)/(-?\d+)/(-?\d+)->\s*(-?\d+)->\s*(-?\d+)")
+    # Some NCCL versions print multiple channel entries on the same line, e.g.:
+    #   "Trees [0] ... [1] ... [2] ..."
+    # Parse all segments instead of only the first one.
+    re_tree_seg_b = re.compile(r"\[(\d+)\]\s+(-?\d+)/(-?\d+)/(-?\d+)->\s*(-?\d+)->\s*(-?\d+)")
+
+    topo: Dict[str, Dict[str, object]] = {}
+
+    for path in sorted(paths):
+        try:
+            # Infer host/pid from standard NCCL_DEBUG_FILE naming.
+            file_host = None
+            file_pid = None
+            mfn = re.search(r"nccl_([^_/]+)_(\d+)\.log$", os.path.basename(path))
+            if mfn:
+                file_host = mfn.group(1)
+                try:
+                    file_pid = int(mfn.group(2))
+                except Exception:
+                    file_pid = None
+
+            with open(path, "r", errors="replace") as f:
+                active_id = None
+                for line in f:
+                    # (A) NVTX-like.
+                    if "commHash" in line:
+                        m = re_comm_a.search(line)
+                        if m:
+                            commHash = m.group(1)
+                            nranks = int(m.group(4))
+                            entry = topo.setdefault(commHash, {"nranks": nranks, "ring": {}, "tree": {}})
+                            # Prefer the largest nranks observed (some logs may be truncated).
+                            try:
+                                entry["nranks"] = max(int(entry.get("nranks", 0)), nranks)
+                            except Exception:
+                                entry["nranks"] = nranks
+                            continue
+
+                        m = re_ring_a.search(line)
+                        if m:
+                            commHash = m.group(1)
+                            ch = m.group(2)
+                            prev_r = m.group(3)
+                            me_r = m.group(4)
+                            next_r = m.group(5)
+                            entry = topo.setdefault(commHash, {"nranks": None, "ring": {}, "tree": {}})
+                            entry["ring"][(me_r, ch)] = {
+                                "previous_rank": prev_r,
+                                "my_rank": me_r,
+                                "next_rank": next_r,
+                                "channel_Id": ch,
+                            }
+                            continue
+
+                        m = re_tree_a.search(line)
+                        if m:
+                            commHash = m.group(1)
+                            entry = topo.setdefault(commHash, {"nranks": None, "ring": {}, "tree": {}})
+                            # Prefer parsing all channel segments on the line (some NCCL prints
+                            # multiple channels after "Trees [0] ...").
+                            for ch, c1, c2, c3, me_r, parent in re_tree_seg_b.findall(line):
+                                entry["tree"][(me_r, ch)] = {
+                                    "child_1_rank": c1,
+                                    "child_2_rank": c2,
+                                    "child_3_rank": c3,
+                                    "my_rank": me_r,
+                                    "parent_rank": parent,
+                                    "channel_Id": ch,
+                                }
+                            continue
+
+                    # (B) Standard NCCL INFO.
+                    if "commId" in line and "Init" in line:
+                        m = re_init_b.search(line)
+                        if m:
+                            # Key by commId since that's the only stable identifier in standard logs.
+                            active_id = m.group(3)
+                            nranks = int(m.group(2))
+                            entry = topo.setdefault(active_id, {"nranks": nranks, "pid_to_rank": {}, "ring": {}, "tree": {}})
+                            try:
+                                entry["nranks"] = max(int(entry.get("nranks", 0)), nranks)
+                            except Exception:
+                                entry["nranks"] = nranks
+                            # Record pid->rank mapping if available.
+                            if file_host is not None and file_pid is not None:
+                                try:
+                                    entry.setdefault("pid_to_rank", {})[(file_host, file_pid)] = int(m.group(1))
+                                except Exception:
+                                    pass
+                            # Do not clear active_id on "Init COMPLETE": some NCCL versions print
+                            # Ring/Tree topology after the COMPLETE line.
+                            continue
+
+                    if active_id is not None:
+                        if "Ring" in line:
+                            m = re_ring_b.search(line)
+                            if m:
+                                ch = m.group(1)
+                                prev_r = m.group(2)
+                                me_r = m.group(3)
+                                next_r = m.group(4)
+                                entry = topo.setdefault(active_id, {"nranks": None, "ring": {}, "tree": {}})
+                                entry.setdefault("pid_to_rank", {})
+                                entry["ring"][(me_r, ch)] = {
+                                    "previous_rank": prev_r,
+                                    "my_rank": me_r,
+                                    "next_rank": next_r,
+                                    "channel_Id": ch,
+                                }
+                                continue
+
+                        if "Trees" in line:
+                            segs = re_tree_seg_b.findall(line)
+                            if segs:
+                                entry = topo.setdefault(active_id, {"nranks": None, "ring": {}, "tree": {}})
+                                entry.setdefault("pid_to_rank", {})
+                                for ch, c1, c2, c3, me_r, parent in segs:
+                                    entry["tree"][(me_r, ch)] = {
+                                        "child_1_rank": c1,
+                                        "child_2_rank": c2,
+                                        "child_3_rank": c3,
+                                        "my_rank": me_r,
+                                        "parent_rank": parent,
+                                        "channel_Id": ch,
+                                    }
+                                continue
+        except OSError:
+            continue
+
+    # Drop entries without any ring/tree info.
+    topo = {h: v for h, v in topo.items() if len(v.get("ring", {})) > 0 or len(v.get("tree", {})) > 0}
+    return topo
+
+
+def get_nsys_events(dir_path, nccl_debug_log_glob: Optional[str] = None, use_nccl_debug_topology: bool = False):
     comm_info = {}
     nccl_events = {}
     profile_interval = {}
@@ -33,6 +213,84 @@ def get_nsys_events(dir_path):
     file_names = os.listdir(dir_path)
     if os.environ.get("ATLAHS_SORT_NSYS_FILES", "1").strip() != "0":
         file_names = sorted(file_names)
+
+    # Optional: pre-scan all sqlite files to compute a single global (intersection) profiling
+    # window. This is particularly helpful for late-capture traces where each process may call
+    # cudaProfilerStart/Stop at slightly different times, producing per-node windows that do not
+    # align and inflate simulated makespans.
+    global_profile_window = None  # (start_ns, end_ns)
+    use_global_intersection = os.environ.get("ATLAHS_PROFILE_USE_GLOBAL_INTERSECTION", "0").strip() == "1"
+    if use_global_intersection:
+        starts = []
+        ends = []
+        for fn in file_names:
+            if not fn.endswith(".sqlite"):
+                continue
+            p = os.path.join(dir_path, fn)
+            try:
+                conn = sqlite3.connect(p)
+                cursor = conn.cursor()
+
+                # Prefer NVTX markers (patched Megatron).
+                cursor.execute("SELECT text, start FROM NVTX_EVENTS WHERE text LIKE 'nsys profiling%'")
+                rows = cursor.fetchall()
+                s = None
+                e = None
+                if rows:
+                    for txt, ts in rows:
+                        if not txt:
+                            continue
+                        if "nsys profiling start" in txt:
+                            s = ts if s is None else min(s, ts)
+                        elif "nsys profiling stopped" in txt:
+                            e = ts if e is None else max(e, ts)
+
+                # Fallback: DIAGNOSTIC_EVENT messages (capture-range=cudaProfilerApi).
+                if s is None or e is None:
+                    try:
+                        cursor.execute(
+                            "SELECT timestamp, text FROM DIAGNOSTIC_EVENT "
+                            "WHERE text LIKE 'Profiling started due to cudaProfilerStart%' "
+                            "   OR text LIKE 'Profiling has started%' "
+                            "   OR text LIKE 'Profiling has stopped%' "
+                            "ORDER BY timestamp"
+                        )
+                        drows = cursor.fetchall()
+                        ds = None
+                        de = None
+                        for ts, txt in drows:
+                            if not txt:
+                                continue
+                            if txt.startswith("Profiling started due to cudaProfilerStart") or txt.startswith("Profiling has started"):
+                                ds = ts if ds is None else min(ds, ts)
+                            elif txt.startswith("Profiling has stopped"):
+                                de = ts if de is None else max(de, ts)
+                        if ds is not None and de is not None:
+                            # Prefer cudaProfilerStart-derived start if present.
+                            s = ds if s is None else min(s, ds)
+                            e = de if e is None else max(e, de)
+                    except Exception:
+                        pass
+
+                conn.close()
+                if s is None or e is None:
+                    continue
+                if int(e) > int(s):
+                    starts.append(int(s))
+                    ends.append(int(e))
+            except Exception:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                continue
+
+        if len(starts) > 0 and len(ends) > 0:
+            gstart = max(starts)
+            gend = min(ends)
+            if gend > gstart:
+                global_profile_window = (int(gstart), int(gend))
+                print(f"[INFO] Global intersection profile window: [{gstart}, {gend}] ({(gend-gstart)/1e9:.6f} s)")
 
     # NCCL 2.28 traces may be exported as one sqlite per rank with names like:
     #   profile_<jobid>_<node>_<rank>.sqlite
@@ -91,6 +349,11 @@ def get_nsys_events(dir_path):
     # Cross-file mapping (per-rank traces): global rank -> synthetic gpuId.
     # Filled lazily when we see NCCL-relevant PIDs in each sqlite.
     global_rank_to_gpuId = {}
+    # For per-node traces, we can still map per-node PIDs to gpuId. This is
+    # required to attach NCCL-debug-log rank mappings to the right gpuId.
+    hostpid_to_gpuId: Dict[Tuple[str, int], int] = {}
+    gpuId_to_hostpid: Dict[int, Tuple[str, int]] = {}
+    commId_to_hostpids: Dict[str, set] = defaultdict(set)
 
     for file_name in file_names:  ## each file may represent a host(root process), containing info of all GPUs (one GPU per child process) or a process corresponding to one GPU
         if file_name.endswith('.sqlite'):
@@ -341,6 +604,58 @@ def get_nsys_events(dir_path):
                         profile_interval[gpuId]["end_raw"] = ts_end
                         profile_interval[gpuId]["end"] = ts_end + profile_end_slack_ns
 
+            # Fallback: for unpatched Megatron runs (or any trace set that doesn't include the
+            # "nsys profiling start/stop" NVTX markers), Nsight Systems may still record the
+            # effective capture window as DIAGNOSTIC_EVENT messages when capture-range is used.
+            #
+            # Using this window is important to keep the computed profiling interval consistent
+            # across ranks/nodes; otherwise we fall back to min/max kernel timestamps which can
+            # drift and cause large LGS mismatches.
+            # Only apply this fallback for GPUs that don't already have an interval from NVTX.
+            missing_profile_gpus = set(pid_to_gpuId.values()) - set(profile_interval.keys())
+            if len(missing_profile_gpus) > 0:
+                try:
+                    cursor.execute(
+                        """
+                        SELECT timestamp, text
+                        FROM DIAGNOSTIC_EVENT
+                        WHERE text LIKE 'Profiling has started%'
+                           OR text LIKE 'Profiling has stopped%'
+                        ORDER BY timestamp
+                        """
+                    )
+                    diag_rows = cursor.fetchall()
+                except Exception:
+                    diag_rows = []
+
+                diag_start = None
+                diag_end = None
+                for ts, txt in diag_rows:
+                    if not txt:
+                        continue
+                    if txt.startswith("Profiling has started"):
+                        diag_start = ts if diag_start is None else min(diag_start, ts)
+                    elif txt.startswith("Profiling has stopped"):
+                        diag_end = ts if diag_end is None else max(diag_end, ts)
+
+                if diag_start is not None and diag_end is not None and diag_end >= diag_start:
+                    for gpuId in missing_profile_gpus:
+                        profile_interval[gpuId] = {
+                            "start_raw": int(diag_start),
+                            "start": int(diag_start) - profile_start_slack_ns,
+                            "end_raw": int(diag_end),
+                            "end": int(diag_end) + profile_end_slack_ns,
+                        }
+
+            # If requested, override per-GPU profile windows with the global intersection window.
+            if global_profile_window is not None and len(profile_interval) > 0:
+                gs, ge = global_profile_window
+                for gid, iv in profile_interval.items():
+                    iv["start"] = int(gs)
+                    iv["end"] = int(ge)
+                    iv.setdefault("start_raw", int(gs))
+                    iv.setdefault("end_raw", int(ge))
+
             cursor.execute('SELECT text, start, end FROM NVTX_EVENTS ORDER BY start')  ## row[0]: text, row[1]: ts_start, row[2]: ts_end
             nvtx_events_results = cursor.fetchall()
 
@@ -436,6 +751,13 @@ def get_nsys_events(dir_path):
                 gid = pid_to_gpuId[pid]
                 if inferred_rank is not None and inferred_rank not in global_rank_to_gpuId:
                     global_rank_to_gpuId[inferred_rank] = gid
+                # Also record host-local pid mapping for log-based recovery.
+                if host_name is not None:
+                    try:
+                        hostpid_to_gpuId[(str(host_name), int(pid))] = gid
+                        gpuId_to_hostpid[int(gid)] = (str(host_name), int(pid))
+                    except Exception:
+                        pass
                 return gid
 
             def ensure_comm_mapping(gpuId: int, commHash: str) -> Tuple[str, str]:
@@ -459,6 +781,11 @@ def get_nsys_events(dir_path):
                     }
 
                 ci = comm_info[commId]
+                try:
+                    if gpuId in gpuId_to_hostpid:
+                        commId_to_hostpids[str(commId)].add(gpuId_to_hostpid[int(gpuId)])
+                except Exception:
+                    pass
                 r = inferred_rank if inferred_rank is not None else 0
                 try:
                     ci["_observed_global_ranks"].add(int(r))
@@ -1476,11 +1803,23 @@ def get_nsys_events(dir_path):
                 len_nccl_events = sum([len(v) for v in nccl_events[goal_rank][gpuId].values()])
                 len_cupti_kernel_results = sum([len(v) for v in cupti_kernel_results[goal_rank][gpuId].values()])
                 if len_nccl_events != len_cupti_kernel_results and len_nccl_events > 0 and len_cupti_kernel_results > 0:
-                    # NCCL 2.28 may launch many kernels per high-level NVTX event. Instead of
-                    # enforcing a 1:1 mapping, derive one synthetic GPU interval per NCCL host
-                    # event using the host-side ts_kernel markers as boundaries.
+                    # Late-capture traces can contain CUDA kernels which don't have matching NCCL NVTX
+                    # metadata (e.g., kernels already in-flight when capture starts). In that case,
+                    # a naive "aggregate all kernels in [ts_kernel_i, ts_kernel_{i+1})" can overestimate
+                    # NCCL time by accidentally absorbing unrelated kernels and/or very long windows.
+                    #
+                    # Instead, derive one synthetic GPU interval per NCCL event using:
+                    # - kernels on the same CUDA stream as the NCCL event
+                    # - kernel type matching (gpu_event_type == coll_type where possible)
+                    # - host-side NVTX duration as a fallback to repair missing kernel end timestamps
                     msg = f'Host {goal_rank} gpu: {gpuId} Different number of events in nccl and cupti kernel results {len_nccl_events} != {len_cupti_kernel_results}'
-                    print(f'[WARN] {msg} (aggregating kernels into per-NVTX GPU intervals)')
+                    if os.environ.get("ATLAHS_SYNTHETIC_CUPTI_ON_MISMATCH", "0").strip() != "1":
+                        # Default: keep the raw CUPTI kernels. Higher-level processing may still be
+                        # able to merge/align streams after filtering out non-NCCL streams.
+                        print(f'[WARN] {msg} (keeping raw CUPTI kernels; set ATLAHS_SYNTHETIC_CUPTI_ON_MISMATCH=1 to synthesize)')
+                        continue
+
+                    print(f'[WARN] {msg} (synthesizing CUPTI per NCCL event)')
 
                     # Flatten NCCL events keeping stable per-stream indices.
                     nccl_refs = []
@@ -1492,31 +1831,77 @@ def get_nsys_events(dir_path):
                             nccl_refs.append((int(t), int(sid), int(idx)))
                     nccl_refs.sort(key=lambda x: x[0])
 
-                    # Flatten kernels across all CUPTI streams.
-                    kernels = []
-                    for sid, kev in cupti_kernel_results[goal_rank][gpuId].items():
+                    # Index CUPTI kernels by stream and keep them time-sorted.
+                    kernels_by_stream = {}
+                    for sid_str, kev in cupti_kernel_results[goal_rank][gpuId].items():
+                        sid_int = int(sid_str)
+                        kernels = []
                         for k in kev:
-                            kernels.append((int(k["ts_gpu_start"]), int(k["ts_gpu_end"])))
-                    kernels.sort(key=lambda x: x[0])
+                            kernels.append(
+                                {
+                                    "gpu_event_type": k.get("gpu_event_type", None),
+                                    "ts_gpu_start": int(k["ts_gpu_start"]),
+                                    "ts_gpu_end": int(k["ts_gpu_end"]),
+                                }
+                            )
+                        kernels.sort(key=lambda x: x["ts_gpu_start"])
+                        kernels_by_stream[sid_int] = kernels
 
-                    # Assign kernels to events by ts_kernel windows.
+                    # Assign per-NCCL-event GPU intervals, avoiding cross-stream contamination.
                     assigned = {}
-                    kpos = 0
+                    # Pre-compute per-event expected type + a sane duration fallback.
+                    expected = {}
+                    for sid_str, evs in nccl_events[goal_rank][gpuId].items():
+                        sid_int = int(sid_str)
+                        for idx, ev in enumerate(evs):
+                            if ev.get("event_type") == "GroupColl":
+                                etype = ev.get("coll_type")
+                            elif ev.get("event_type") == "GroupP2P":
+                                etype = "SendRecv"
+                            else:
+                                etype = ev.get("event_type")
+                            t0 = int(ev.get("ts_kernel", ev.get("ts_start", 0)))
+                            # Host-side duration is imperfect but better than zero-length kernels.
+                            host_dur = int(ev.get("ts_end", t0)) - int(ev.get("ts_kernel", t0))
+                            if host_dur <= 0:
+                                host_dur = int(ev.get("ts_end", t0)) - int(ev.get("ts_start", t0))
+                            if host_dur <= 0:
+                                host_dur = 1
+                            expected[(sid_int, idx)] = (etype, t0, host_dur)
+
                     for i, (t0, sid, idx) in enumerate(nccl_refs):
                         t1 = nccl_refs[i + 1][0] if (i + 1) < len(nccl_refs) else 2**63 - 1
-                        w = []
-                        while kpos < len(kernels) and kernels[kpos][0] < t0:
-                            kpos += 1
-                        kscan = kpos
-                        while kscan < len(kernels) and kernels[kscan][0] < t1:
-                            w.append(kernels[kscan])
-                            kscan += 1
-                        if len(w) > 0:
-                            gpu_start = min(s for s, _ in w)
-                            gpu_end = max(e for _, e in w)
+                        etype, t0_exp, host_dur = expected.get((sid, idx), (None, t0, 1))
+
+                        # Candidate kernels: same stream, starting within [t0, t1).
+                        stream_kernels = kernels_by_stream.get(sid, [])
+                        cand_ixs = [j for j, k in enumerate(stream_kernels) if (t0 <= k["ts_gpu_start"] < t1)]
+
+                        # Prefer kernels whose gpu_event_type matches NCCL event type, but keep a fallback.
+                        typed_ixs = []
+                        if etype is not None:
+                            typed_ixs = [j for j in cand_ixs if stream_kernels[j].get("gpu_event_type") == etype]
+                        use_ixs = typed_ixs if typed_ixs else cand_ixs
+
+                        if use_ixs:
+                            gpu_start = min(stream_kernels[j]["ts_gpu_start"] for j in use_ixs)
+
+                            # Repair missing kernel end timestamps using the next kernel start on the same stream.
+                            gpu_end = gpu_start
+                            for j in use_ixs:
+                                ks = stream_kernels[j]["ts_gpu_start"]
+                                ke = stream_kernels[j]["ts_gpu_end"]
+                                if ke <= ks:
+                                    nxt = stream_kernels[j + 1]["ts_gpu_start"] if (j + 1) < len(stream_kernels) else t1
+                                    ke = min(int(t1), int(nxt))
+                                    if ke <= ks:
+                                        ke = ks + 1
+                                gpu_end = max(gpu_end, ke)
                         else:
-                            gpu_start = t0
-                            gpu_end = t0
+                            # No matching kernel recorded: fall back to a minimal interval at ts_kernel.
+                            gpu_start = int(t0_exp)
+                            gpu_end = gpu_start + max(1, host_dur)
+
                         assigned[(sid, idx)] = (gpu_start, gpu_end)
 
                     # Build per-NCCL-stream synthetic CUPTI lists that match length+types.
@@ -1607,6 +1992,147 @@ def get_nsys_events(dir_path):
         ci.pop("_max_channels", None)
         ci.pop("_inferred", None)
 
+    # Optional: reconstruct/init topology from NCCL debug logs when INIT NVTX markers are missing.
+    # This is useful when nsys started tracing after communicator creation (capture-range),
+    # so the trace contains API/ENQUEUE markers but not Rings/Trees/CommInit markers.
+    if use_nccl_debug_topology and nccl_debug_log_glob:
+        topo_by_commhash = _parse_nccl_debug_topology_from_logs(nccl_debug_log_glob)
+        if len(topo_by_commhash) > 0:
+            topo_id_to_hostpids = {}
+            for tid, topo in topo_by_commhash.items():
+                try:
+                    topo_id_to_hostpids[tid] = set((topo.get("pid_to_rank") or {}).keys())
+                except Exception:
+                    topo_id_to_hostpids[tid] = set()
+
+            applied = 0
+            for commId, ci in comm_info.items():
+                topo_key = commId
+                topo = topo_by_commhash.get(topo_key)
+                if topo is None:
+                    # Heuristic: match commId (NVTX commHash) to a log-commId by the set of (host,pid)
+                    # that participates in that communicator.
+                    try:
+                        comm_set = commId_to_hostpids.get(str(commId), set())
+                    except Exception:
+                        comm_set = set()
+                    if comm_set:
+                        best = None
+                        best_n = 0
+                        for tid, hp in topo_id_to_hostpids.items():
+                            n = len(comm_set & hp)
+                            if n > best_n:
+                                best_n = n
+                                best = tid
+                        if best is not None and best_n == len(comm_set) and len(comm_set) >= 2:
+                            topo_key = best
+                            topo = topo_by_commhash.get(best)
+                if topo is None:
+                    continue
+
+                ring_map = topo.get("ring", {})
+                tree_map = topo.get("tree", {})
+                pid_to_rank = topo.get("pid_to_rank", {})
+                if len(ring_map) == 0 and len(tree_map) == 0:
+                    continue
+
+                # Update nranks if present in logs.
+                if topo.get("nranks") is not None:
+                    try:
+                        ci["nranks"] = int(topo["nranks"])
+                    except Exception:
+                        pass
+
+                # Build per-rank channel lists, sorted by channel id.
+                by_rank_ring: Dict[str, List[Dict[str, str]]] = defaultdict(list)
+                for (r, ch), v in ring_map.items():
+                    by_rank_ring[str(r)].append(dict(v))
+                for r in by_rank_ring:
+                    by_rank_ring[r].sort(key=lambda d: int(d.get("channel_Id", "0")))
+
+                by_rank_tree: Dict[str, List[Dict[str, str]]] = defaultdict(list)
+                for (r, ch), v in tree_map.items():
+                    by_rank_tree[str(r)].append(dict(v))
+                for r in by_rank_tree:
+                    by_rank_tree[r].sort(key=lambda d: int(d.get("channel_Id", "0")))
+
+                # Best-effort: use NCCL debug logs to map host-local pid -> NCCL rank,
+                # and then connect that pid to the trace gpuId seen in SQLite.
+                rank_to_host: Dict[str, str] = {}
+                rank_to_gpuId: Dict[str, int] = {}
+                if isinstance(pid_to_rank, dict) and len(pid_to_rank) > 0:
+                    for (h, p), rint in pid_to_rank.items():
+                        rstr = str(int(rint))
+                        try:
+                            rank_to_host.setdefault(rstr, str(h))
+                        except Exception:
+                            pass
+                        try:
+                            gid = hostpid_to_gpuId.get((str(h), int(p)))
+                            if gid is not None:
+                                rank_to_gpuId[rstr] = int(gid)
+                        except Exception:
+                            pass
+
+                # Prefer ranks from pid mapping; otherwise fall back to ranks present in ring/tree.
+                ranks_seen = set(list(by_rank_ring.keys()) + list(by_rank_tree.keys()) + list(rank_to_host.keys()) + list(rank_to_gpuId.keys()))
+                if len(ranks_seen) == 0:
+                    continue
+
+                new_rank_info: Dict[str, Dict[str, object]] = {}
+                new_gpu_to_rank: Dict[int, str] = {}
+                for r in sorted(ranks_seen, key=lambda x: int(x)):
+                    host = rank_to_host.get(r, "unknown")
+                    grank = HostName_To_GoalRank.get(host, 0) if host != "unknown" else 0
+                    gid = int(rank_to_gpuId.get(r, -1))
+                    if gid >= 0:
+                        new_gpu_to_rank[gid] = r
+                    new_rank_info[r] = {
+                        "gpuId": gid,
+                        "goal_rank": int(grank),
+                        "host_name": host,
+                        "channel_info": {"Ring": by_rank_ring.get(r, []), "Tree": by_rank_tree.get(r, [])},
+                    }
+
+                ci["rank_To_rankInfo"] = new_rank_info
+                ci["gpuId_To_rank"] = new_gpu_to_rank
+
+                applied += 1
+
+            if applied > 0:
+                print(f"[INFO] Applied NCCL debug-log topology for {applied} communicator(s) (glob: {nccl_debug_log_glob})")
+
+    # Ensure comm_info is JSON-serializable (intermediate outputs are JSON).
+    for _, ci in comm_info.items():
+        # Internal inference fields:
+        ci.pop("_observed_global_ranks", None)
+        ci.pop("_max_channels", None)
+
+    # After log-based recovery, drop events that belong to nranks<=1 communicators.
+    # These often appear in late-traced runs because fallback nranks is >1 during parsing
+    # (before we apply the recovered topology), but the real communicator is local-only.
+    for grank, gpus in list(nccl_events.items()):
+        for gid, streams in list(gpus.items()):
+            for sid, evs in list(streams.items()):
+                new_evs = []
+                for ev in evs:
+                    cid = ev.get("commId")
+                    try:
+                        nr = int(comm_info.get(cid, {}).get("nranks", 2))
+                    except Exception:
+                        nr = 2
+                    if nr <= 1:
+                        continue
+                    new_evs.append(ev)
+                if len(new_evs) == 0:
+                    del nccl_events[grank][gid][sid]
+                else:
+                    nccl_events[grank][gid][sid] = new_evs
+            if len(nccl_events[grank][gid]) == 0:
+                del nccl_events[grank][gid]
+        if len(nccl_events[grank]) == 0:
+            del nccl_events[grank]
+
     # Ensure every GPU has a comm-init interval. Some trace sets start profiling after
     # communicator creation, so "commHash ... commId ... rank ..." markers are missing.
     # Downstream dependency builders still require a (ts_init_start, ts_init_end) anchor.
@@ -1673,6 +2199,17 @@ def get_nsys_events(dir_path):
             if clamp_window_ns is not None and clamp_window_ns > 0:
                 s = int(profile_interval[gpuId]["start"])
                 profile_interval[gpuId]["end"] = min(int(profile_interval[gpuId]["end"]), s + int(clamp_window_ns))
+
+    # If we pre-scanned a global intersection window, enforce it now (after any kernel-based
+    # fallback interval construction). This intentionally does NOT trim events; it only ensures
+    # downstream computations (e.g., exposed comm time) use a consistent window across nodes.
+    if global_profile_window is not None and len(profile_interval) > 0:
+        gs, ge = global_profile_window
+        for _, iv in profile_interval.items():
+            iv["start"] = int(gs)
+            iv["end"] = int(ge)
+            iv.setdefault("start_raw", int(gs))
+            iv.setdefault("end_raw", int(ge))
 
     # Optional: deterministically remap goal ranks + GPU IDs using the largest communicator
     # (max nranks) as the stable reference.
@@ -1829,17 +2366,24 @@ def merge_stream_if_no_overlap(nccl_events, cupti_kernel_results):
             assert len(tmp_nccl_events) == sum([len(v) for v in nccl_events[goal_rank][gpuId].values()]), 'Different number of events in nccl_events'
             assert len(tmp_cupti_kernel_results) == sum([len(v) for v in cupti_kernel_results[goal_rank][gpuId].values()]), 'Different number of events in cupti_kernel_results'
 
-            # Checks if there is any overlap between the events
-            assert len(tmp_nccl_events) == len(tmp_cupti_kernel_results), f'Different number of events in nccl and cupti kernel results {len(tmp_nccl_events)} != {len(tmp_cupti_kernel_results)}'
+            # Checks if there is any overlap between the events.
+            # Some traces (especially after post-filtering or late-tracing recovery) may have
+            # a different number of NCCL NVTX intervals vs CUPTI kernels. In that case we
+            # cannot safely align them for stream-merging; keep the original per-stream events.
+            if len(tmp_nccl_events) != len(tmp_cupti_kernel_results):
+                if os.environ.get("ATLAHS_FORCE_STREAM_MERGE_ON_MISMATCH", "0").strip() != "1":
+                    print(f"[WARN] GPU {gpuId} on goal rank {goal_rank}: different number of NCCL vs CUPTI events ({len(tmp_nccl_events)} != {len(tmp_cupti_kernel_results)}); skipping stream merge")
+                    return nccl_events, cupti_kernel_results
+                print(f"[WARN] GPU {gpuId} on goal rank {goal_rank}: NCCL vs CUPTI event count mismatch ({len(tmp_nccl_events)} != {len(tmp_cupti_kernel_results)}); forcing stream merge (ATLAHS_FORCE_STREAM_MERGE_ON_MISMATCH=1)")
+
             for i in range(len(tmp_nccl_events) - 1):
                 if tmp_nccl_events[i]['ts_end'] > tmp_nccl_events[i+1]['ts_start'] or \
-                    tmp_cupti_kernel_results[i]['ts_gpu_end'] > tmp_cupti_kernel_results[i+1]['ts_gpu_start']:
+                    (i < len(tmp_cupti_kernel_results) - 1 and tmp_cupti_kernel_results[i]['ts_gpu_end'] > tmp_cupti_kernel_results[i+1]['ts_gpu_start']):
                     print(f"[INFO] Overlap detected for GPU {gpuId} on goal rank {goal_rank}, not merging streams")
                     return nccl_events, cupti_kernel_results
 
             merged_nccl_events[goal_rank][gpuId][0] = tmp_nccl_events
-            kernel_stream_id = sorted(cupti_kernel_results[goal_rank][gpuId].keys(), key=int)[0]
-            merged_cupti_kernel_results[goal_rank][gpuId][kernel_stream_id] = tmp_cupti_kernel_results
+            merged_cupti_kernel_results[goal_rank][gpuId][0] = tmp_cupti_kernel_results
             print(f"[INFO] No overlap detected for GPU {gpuId} on goal rank {goal_rank}")
             print(f"[INFO] Streams from GPU {gpuId} have been merged into a single stream, number of events: {len(tmp_nccl_events)}")
     
